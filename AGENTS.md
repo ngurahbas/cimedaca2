@@ -20,6 +20,7 @@ SvelteKit app using Svelte 5 runes mode (forced for all project files). UI built
 **Theme system**: Two themes available - `modern` (light) and `vox` (dark). Theme and mode stored in localStorage, applied via `data-theme` and `data-mode` attributes on `<html>`. Theme toggle component at `$lib/components/ThemeToggle.svelte`.
 
 **Entry points**:
+
 - Routes: `src/routes/`
 - Shared components: `src/lib/components/`
 - Layout: `src/routes/+layout.svelte` (imports theme toggle and favicon)
@@ -28,6 +29,7 @@ SvelteKit app using Svelte 5 runes mode (forced for all project files). UI built
 ## Testing
 
 Vitest configured with two projects:
+
 - **client**: browser-based tests for `.svelte.{test,spec}.{js,ts}` files
 - **server**: node environment for other `*.{test,spec}.{js,ts}` files
 
