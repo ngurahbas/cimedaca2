@@ -36,6 +36,7 @@
 		<Menubar.Portal>
 			<Menubar.Content
 				class="z-50 min-w-[10rem] rounded-md border border-surface-200-800 bg-surface-50-950 p-1 shadow-md"
+				align="start"
 				sideOffset={6}
 			>
 				<Menubar.Item
@@ -57,6 +58,7 @@
 		<Menubar.Portal>
 			<Menubar.Content
 				class="z-50 min-w-[12rem] rounded-md border border-surface-200-800 bg-surface-50-950 p-1 shadow-md"
+				align="start"
 				sideOffset={6}
 			>
 				<div
