@@ -1,9 +1,9 @@
 <script lang="ts">
-	import Menubar from '$lib/components/Menubar.svelte';
+	import ThemeMenu from '$lib/components/ThemeMenu.svelte';
 </script>
 
 <div class="flex flex-col gap-6 p-6">
-	<Menubar />
+	<ThemeMenu />
 
 	<h1 class="text-2xl font-bold">Welcome to SvelteKit</h1>
 	<p>
