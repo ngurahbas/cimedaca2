@@ -4,18 +4,20 @@
 
 Build the initial phase of the `/reader` route:
 
-1. Menubar with **File > Open** and **Dark Mode** switch.
-2. **Navigation Pane** with toggle tab between **Thumbnails** and **Outline**; on desktop sits at the left of the content, on mobile sits above the content and is hidden by default.
+1. Menubar with **File > Open**, **View** toggles, **Theme** picker, and **Dark Mode** switch.
+2. **Navigation Pane** with toggle tab between **Thumbnails** and **Outline**; on desktop sits at the left of the content, on mobile slides in as a top-drawer overlay and is hidden by default.
 3. **Content Pane** that renders an opened PDF.
 4. **AI Pane** that sits to the right of the content on desktop and below the content on mobile (placeholder for now).
 5. Each side pane has an arrow button on its **inner edge** that collapses it to a thin rail (still clickable to re-open).
 
 ## Decisions (confirmed)
 
-- PDF rendering: **`pdfjs-dist`** directly (already in `node_modules`).
-- File Open: **local file** via `<input type="file" accept="application/pdf">`.
+- PDF rendering: **`pdfjs-dist`** directly (added to `devDependencies` explicitly so it's not just a transitive dep).
+- File Open: **local file** via `<input type="file" accept="application/pdf">`. One `openPdfFile(file)` helper on the controller, called from every entry point (menubar, empty state, future drag-and-drop).
 - Toggle arrows: **on the inner edge** of each pane.
-- Default state: **panes open by default** on desktop, collapsing to a thin rail (~40px) when the arrow is clicked. On mobile, panes are **hidden by default** and toggled via the same arrow.
+- Desktop: panes **open by default**; collapse to a ~40px rail when the arrow is clicked.
+- Mobile: **nav pane** is a top-drawer overlay (hidden by default; backdrop + click-outside + Esc to close; body scroll lock while open). **AI pane** is a regular stacked row below the content, toggled inline. The two are independent.
+- **Theme menu** is reused via a new `<ThemeMenuMenu />` component extracted from `src/lib/components/ThemeMenu.svelte`. `ThemeMenu.svelte` becomes a thin wrapper that renders `<Menubar.Root><ThemeMenuMenu /></Menubar.Root>` for the home page; `ReaderMenubar.svelte` embeds `<ThemeMenuMenu />` inside its own `<Menubar.Root>`.
 
 ## Layout
 
@@ -23,14 +25,12 @@ Build the initial phase of the `/reader` route:
 
 ```
 ┌──────────────────────────┐
-│ Menubar (File, Dark mode)│
+│ Menubar (File, View, …)  │
 ├──────────────────────────┤
-│ Navigation Pane (hidden  │  ← arrow toggles
-│ by default, slides in)   │
+│      Content Pane        │  ◀── NavigationPane slides in as a top drawer
+│                          │      (max ~60% height, backdrop, scroll-locked)
 ├──────────────────────────┤
-│      Content Pane        │
-├──────────────────────────┤
-│      AI Pane             │  ← arrow toggles (placeholder)
+│      AI Pane             │  ◀── stacked below, arrow toggles inline
 └──────────────────────────┘
 ```
 
@@ -42,112 +42,168 @@ Build the initial phase of the `/reader` route:
 ├──────┬──────────────────────────┬────────┤
 │ Nav  │                          │   AI   │
 │ Pane │      Content Pane        │  Pane  │
-│  ▶   │                          │  ◀     │
+│  ◀   │                          │  ▶     │
 └──────┴──────────────────────────┴────────┘
 ```
 
 When collapsed, each side pane shrinks to a ~40px rail that still shows the arrow.
 
-## File structure (all new files)
+## File structure
 
 ```
 src/routes/reader/
-  +page.svelte                          ← assembles layout, owns pane state via store
+  +page.svelte                          ← assembles layout, owns layout classes
 
 src/lib/components/reader/
-  ReaderMenubar.svelte                  ← File > Open, View > toggles, Dark mode switch
-  NavigationPane.svelte                 ← Skeleton Tabs: Thumbnails | Outline
-  ContentPane.svelte                    ← hosts PdfViewer or EmptyState
-  PdfViewer.svelte                      ← pdfjs-dist canvas renderer
-  AiPane.svelte                         ← placeholder ("AI Pane")
-  PaneToggle.svelte                     ← arrow button reused on both edges
-  EmptyState.svelte                     ← shown in ContentPane before a PDF is opened
+  ReaderMenubar.svelte                  ← bits-ui Menubar: File, View, ThemeMenuMenu, Dark switch
+  NavigationPane.svelte                 ← Skeleton Tabs (Thumbnails | Outline) + drawer wrapper
+  ContentPane.svelte                    ← PdfViewer | EmptyState
+  PdfViewer.svelte                      ← pdfjs-dist, dynamic-imported, state machine
+  AiPane.svelte                         ← placeholder
+  PaneToggle.svelte                     ← chevron button, side prop
+  EmptyState.svelte                     ← centered card + "Open PDF" button
 
 src/lib/stores/
-  reader.svelte.ts                      ← pane visibility, active nav tab, loaded doc
-```
+  reader.svelte.ts                      ← ReaderController (pane state, active tab, doc)
 
-No existing files are modified. `Menubar.svelte` and the theme store are reused as-is for patterns/components, but the reader uses its own menubar so it can include the File menu.
+src/lib/components/                     ← refactor (existing file changes)
+  ThemeMenu.svelte                      ← now: Menubar.Root wrapper around <ThemeMenuMenu />
+  ThemeMenuMenu.svelte                  ← NEW: the inner Menubar.Menu block, embeddable
+```
 
 ## State (`src/lib/stores/reader.svelte.ts`)
 
 ```ts
-class ReaderController {
-  showNav = $state(true)
-  showAi = $state(true)
-  activeTab = $state<'thumbs' | 'outline'>('thumbs')
-  doc = $state<{ name: string; data: ArrayBuffer } | null>(null)
+import { browser } from '$app/environment';
 
-  toggleNav() { this.showNav = !this.showNav }
-  toggleAi() { this.showAi = !this.showAi }
-  setDoc(name: string, data: ArrayBuffer) { this.doc = { name, data } }
-  clearDoc() { this.doc = null }
+class ReaderController {
+	showNav = $state(true);
+	showAi = $state(true);
+	mobileNavOpen = $state(false);
+	activeTab = $state<'thumbs' | 'outline'>('thumbs');
+	// raw to avoid Svelte proxying a multi-MB ArrayBuffer
+	doc = $state.raw<{ name: string; data: ArrayBuffer } | null>(null);
+
+	toggleNav() {
+		this.showNav = !this.showNav;
+	}
+	toggleAi() {
+		this.showAi = !this.showAi;
+	}
+	openMobileNav() {
+		this.mobileNavOpen = true;
+	}
+	closeMobileNav() {
+		this.mobileNavOpen = false;
+	}
+
+	async openPdfFile(file: File) {
+		const data = await file.arrayBuffer();
+		this.doc = { name: file.name, data };
+	}
+	clearDoc() {
+		this.doc = null;
+	}
 }
-export const readerController = new ReaderController()
+
+export const readerController = new ReaderController();
+
+if (browser) {
+	document.documentElement.addEventListener('keydown', (e) => {
+		if (e.key === 'Escape') readerController.closeMobileNav();
+	});
+}
 ```
+
+Notes:
+- `doc` is `$state.raw` so Svelte 5 doesn't proxy a multi-MB buffer; `PdfViewer` re-renders on change via a keyed effect.
+- Single `openPdfFile(file)` entry point — used by `ReaderMenubar`'s file input, `EmptyState`'s button, and (future) drag-and-drop / URL loading.
+- Esc closes the mobile drawer. No other shortcuts in this phase.
 
 ## Component details
 
+### `ThemeMenu.svelte` (refactor) and `ThemeMenuMenu.svelte` (new)
+
+- `ThemeMenuMenu.svelte` exports the inner `Menubar.Menu` block (trigger + portal + content + radio group of all `THEMES`). Standalone-embeddable.
+- `ThemeMenu.svelte` becomes: `<Menubar.Root class="…"><ThemeMenuMenu /></Menubar.Root>` plus the existing Dark-mode `Switch` (preserves the home-page appearance).
+- `ReaderMenubar.svelte` wraps multiple menus in a single `<Menubar.Root>` and embeds `<ThemeMenuMenu />` inside it.
+
 ### `ReaderMenubar.svelte`
 
-- Built with bits-ui `Menubar` (same pattern as the existing `Menubar.svelte`).
-- **File** menu: "Open…" item triggers a hidden `<input type="file" accept="application/pdf">`. On change, reads via `FileReader.readAsArrayBuffer`, calls `readerController.setDoc(name, data)`, closes the menu.
-- **View** menu: two Switches — "Show Navigation" bound to `readerController.showNav`, "Show AI Pane" bound to `readerController.showAi`.
-- **Theme** menu: kept (matches existing Menubar) — radio list of all `THEMES`.
-- **Appearance** menu: "Dark mode" Switch bound to `themeController.setMode` (lifted from existing Menubar).
+- bits-ui `Menubar` primitives (same pattern as `ThemeMenu.svelte`).
+- **File** menu → "Open…" item triggers a hidden `<input type="file" accept="application/pdf">`; on change, calls `readerController.openPdfFile(file)` and closes the menu.
+- **View** menu → two `Switch`es bound to `showNav` / `showAi`. Disabled on mobile (the nav pane is a drawer there, not show/hide).
+- **Theme** menu → embeds `<ThemeMenuMenu />`.
+- **Dark mode** `Switch` bound to `themeController.setMode` (lifted from `ThemeMenu.svelte`).
 
 ### `NavigationPane.svelte`
 
-- Skeleton `Tabs` with two panels: **Thumbnails** and **Outline**.
-- *Thumbnails*: when `doc` is `null` → "Open a PDF to see thumbnails". When present, uses `pdfjs.getDocument({ data }).promise` and renders one small canvas per page in a scrollable list. Lazy-render via `IntersectionObserver` for performance.
-- *Outline*: uses `pdf.getOutline()` to render a nested list of headings. Clicking a heading scrolls the ContentPane to that page (via a method on `PdfViewer`). Falls back to a friendly empty state if the PDF has no outline.
-- The component is wrapped by a flex container that handles the desktop left-rail / mobile drawer logic (driven by `readerController.showNav`).
+- `Skeleton.Tabs` with two `Content` panels: **Thumbnails** and **Outline**.
+- **Thumbnails** (`doc === null`): "Open a PDF to see thumbnails". When present: a single `IntersectionObserver` observes all thumbnail wrappers at once, with a small FIFO render queue (e.g. 2 concurrent). Each item is a fixed-size canvas (~120px wide) rendered via `pdfjs.getDocument({ data }).promise` once and reused.
+- **Outline** (`doc === null`): "Open a PDF to see its outline". When present: `pdf.getOutline()` → recursive nested list (render 3 levels deep, deeper items get an ellipsis). Clicking a leaf calls `viewer.scrollToPage(n)`. If the outline array is empty, render a small "This PDF has no outline" message **inside** the tab — do NOT auto-switch to Thumbnails.
+- Outer flex container handles the desktop rail / mobile drawer. On mobile, the drawer is positioned `absolute inset-x-0 top-0 z-40` with `max-height: 60vh`, a backdrop, focus trap while open, and a body `overflow-hidden` toggle driven by `mobileNavOpen`.
 
 ### `ContentPane.svelte`
 
-- Flex column. When `doc` is `null` → renders `<EmptyState />`. When present → renders `<PdfViewer data={doc.data} bind:this={viewer} />`.
-- Hosts the right-edge arrow button → `readerController.toggleNav()`. On mobile, the same arrow opens the Navigation Pane as a drawer that overlays the content.
+- Flex column. `doc === null` → `<EmptyState />`. Otherwise → `<PdfViewer {data} bind:this={viewer} />`.
+- Hosts the **left-edge** `PaneToggle` for nav: on desktop, `readerController.toggleNav()`; on mobile, `readerController.openMobileNav()`.
+- The host is a `relative` flex item so the absolutely-positioned arrow sticks to the inner edge.
 
 ### `PdfViewer.svelte`
 
-- Uses `pdfjs-dist` directly.
-- Worker setup: `GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url)` (Vite-friendly).
-- On mount / data change: `getDocument({ data }).promise`, then renders each page to a `<canvas>` stacked vertically inside a scroll container.
-- Exposes `scrollToPage(n: number)` via a bound method so the Outline can navigate.
-- All `pdfjs` calls are guarded with `browser` from `$app/environment`; SSR returns a placeholder.
+- All `pdfjs-dist` imports happen inside an `onMount` dynamic `import('pdfjs-dist')` so SSR doesn't ship the bundle.
+- Worker: `new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url)` (Vite-friendly; file confirmed present in v6.0.227). Sets `GlobalWorkerOptions.workerSrc` once.
+- `status = $state<'idle' | 'loading' | 'ready' | 'error'>('idle')`; render skeleton spinner / error card accordingly.
+- `$effect` on `data`: `getDocument({ data }).promise` → store `pdfDocument`. In the cleanup branch, call `await prev.destroy()` before loading the new one (prevents worker/memory leaks on swap). Renders each page to a stacked canvas in a scroll container.
+- Exports `scrollToPage(n: number)` as a `<script>`-level function so `bind:this` works.
+- SSR returns a `<div>Loading viewer…</div>` placeholder.
 
 ### `AiPane.svelte`
 
-- Placeholder card with a label "AI Pane" and an icon.
-- Hosts the left-edge arrow button → `readerController.toggleAi()`.
+- Placeholder card with label "AI Pane" + an icon.
+- Hosts the **left-edge** `PaneToggle` for the AI pane (`side="right"` semantically — the arrow's `side` is the pane it belongs to, not which way it points).
 
 ### `PaneToggle.svelte`
 
 - Props: `side: 'left' | 'right'`, `collapsed: boolean`, `onclick: () => void`.
-- Renders a vertical Skeleton `button preset-tonal` with a chevron icon that rotates based on `collapsed`.
-- Absolutely positioned against the parent pane so it stays on the inner edge.
+- Skeleton `button preset-tonal`, vertical orientation, absolutely positioned to its parent pane's inner edge.
+- Chevron icon rotates 180° based on `collapsed` (left-pane arrow points left when expanded → right when collapsed; right-pane arrow is mirrored).
 
 ### `EmptyState.svelte`
 
-- Friendly centered card with text "Open a PDF to get started" and a button that opens the file picker (re-uses the hidden input from `ReaderMenubar`, or shows a hint to use File > Open).
+- Centered card with "Open a PDF to get started" + primary button.
+- Button opens a hidden `<input type="file" accept="application/pdf">` local to this component; on change, calls `readerController.openPdfFile(file)`. (Decoupled from `ReaderMenubar`; both call the same `openPdfFile` helper.)
+- Secondary hint: "…or use File → Open".
 
 ## Routing
 
-No changes. `/reader` is reached by navigating to `/reader`; the existing `+layout.svelte` continues to wrap it.
+- New route `src/routes/reader/+page.svelte`. No reader-specific `+layout.svelte` in this phase — `src/routes/+layout.svelte` already wraps everything and only imports `layout.css` and the favicon, so no changes there.
 
 ## Dependencies
 
-- `pdfjs-dist` is already in `node_modules` (confirmed). No `package.json` change.
+- `pdfjs-dist@^6.0.227` added to `devDependencies` in `package.json` (currently only a transitive dep — locks it in).
+- All other libs already present: `bits-ui`, `@skeletonlabs/skeleton-svelte`, Tailwind 4.
 
 ## Verification
 
-- `bun run check` — typecheck
-- `bun run lint` — Prettier + ESLint
-- (Optional, not in this phase) `tests/e2e/reader.e2e.ts` — Playwright test for the three panes + menubar.
+- `bun run check` — typecheck (catches `$state.raw` and effect cleanup types).
+- `bun run lint` — Prettier + ESLint.
+- `bun run test:unit` — confirms the existing client/server Vitest projects still pass (no new tests in this phase, but the run is cheap insurance).
+- Manual smoke: open `/reader` → empty state → open a multi-page PDF → toggle nav (desktop rail collapse) → switch tab → click outline entry → shrink to mobile width → open/close drawer → click backdrop → press Esc.
+
+## Out of scope (explicitly deferred)
+
+- Zoom in/out, page-fit modes, page-number indicator.
+- Full-text search, text selection, annotations.
+- Drag-and-drop file open, URL-based open, recent files.
+- Persisted reader state (last open file, pane positions, tab choice) — `localStorage` later.
+- Real AI pane (chat, summarize, ask-document) — placeholder only.
+- Unit/E2E tests — manual smoke for this phase; e2e harness comes with the AI pane.
 
 ## Notes / assumptions
 
-- The `Theme` menu is kept in `ReaderMenubar` so the reader is fully themeable.
+- The Theme menu is embedded via the extracted `<ThemeMenuMenu />` so the reader is fully themeable without duplicating the radio-group markup.
 - The AI Pane is a pure static placeholder — no skeleton/fake chat UI.
-- Thumbnails are real pdfjs renders (one canvas per page). Lazy via `IntersectionObserver`.
-- The arrow button on mobile opens the Navigation Pane as a top drawer overlaying the content. The AI Pane on mobile is shown stacked below the content and toggled via the same arrow pattern.
+- Thumbnails are real pdfjs renders (one canvas per page). Lazy via a single `IntersectionObserver` + render queue.
+- The arrow button on mobile opens the Navigation Pane as a top drawer overlaying the content. The AI Pane on mobile is shown stacked below the content and toggled inline.
+- Only existing files modified: `package.json` (add `pdfjs-dist`) and `src/lib/components/ThemeMenu.svelte` (split into wrapper + `ThemeMenuMenu.svelte`).
