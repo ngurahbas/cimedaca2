@@ -62,14 +62,11 @@
 				sideOffset={6}
 			>
 				<div
-					class="flex items-center justify-between gap-3 rounded px-2 py-1.5 text-sm text-surface-950-50 select-none data-[disabled]:opacity-50"
-					data-disabled={readerController.isMobile}
-					aria-disabled={readerController.isMobile}
+					class="flex items-center justify-between gap-3 rounded px-2 py-1.5 text-sm text-surface-950-50 select-none"
 				>
 					<span>Navigation pane</span>
 					<Switch.Root
 						checked={readerController.showNav}
-						disabled={readerController.isMobile}
 						onCheckedChange={(v: boolean) => (readerController.showNav = v)}
 						class="inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border border-surface-300-700 bg-surface-300-700 transition-colors outline-none data-[disabled]:cursor-not-allowed data-[state=checked]:border-primary-500 data-[state=checked]:bg-primary-500"
 					>
@@ -79,14 +76,11 @@
 					</Switch.Root>
 				</div>
 				<div
-					class="flex items-center justify-between gap-3 rounded px-2 py-1.5 text-sm text-surface-950-50 select-none data-[disabled]:opacity-50"
-					data-disabled={readerController.isMobile}
-					aria-disabled={readerController.isMobile}
+					class="flex items-center justify-between gap-3 rounded px-2 py-1.5 text-sm text-surface-950-50 select-none"
 				>
 					<span>AI pane</span>
 					<Switch.Root
 						checked={readerController.showAi}
-						disabled={readerController.isMobile}
 						onCheckedChange={(v: boolean) => (readerController.showAi = v)}
 						class="inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border border-surface-300-700 bg-surface-300-700 transition-colors outline-none data-[disabled]:cursor-not-allowed data-[state=checked]:border-primary-500 data-[state=checked]:bg-primary-500"
 					>

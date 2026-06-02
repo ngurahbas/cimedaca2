@@ -1,10 +1,14 @@
 <script lang="ts">
 	import Bot from '@lucide/svelte/icons/bot';
+	import { Collapsible } from 'bits-ui';
 	import { readerController } from '$lib/stores/reader.svelte';
 
-	function toggleAi() {
-		readerController.toggleAi();
-	}
+	const chevronRotation = $derived.by(() => {
+		if (readerController.isMobile) {
+			return readerController.showAi ? 180 : 0;
+		}
+		return readerController.showAi ? 90 : -90;
+	});
 </script>
 
 {#snippet placeholder()}
@@ -17,48 +21,36 @@
 	</div>
 {/snippet}
 
-{#if readerController.isMobile}
-	<aside
-		aria-label="AI"
-		class="flex shrink-0 flex-col overflow-hidden rounded-md border border-surface-200-800 bg-surface-50-950"
+<Collapsible.Root
+	bind:open={readerController.showAi}
+	aria-label="AI"
+	class="flex shrink-0 flex-col overflow-hidden rounded-md border border-surface-200-800 bg-surface-50-950 md:h-full md:flex-row"
+>
+	<Collapsible.Trigger
+		class="flex shrink-0 items-center justify-between gap-2 border-b border-surface-200-800 bg-surface-50-950 px-3 py-2 text-sm font-semibold text-surface-950-50 hover:bg-surface-100-900 md:flex-col md:justify-center md:gap-1.5 md:border-r md:border-b-0 md:px-2 md:py-3"
 	>
-		<button
-			type="button"
-			onclick={toggleAi}
-			aria-expanded={readerController.showAi}
-			class="flex items-center justify-between gap-2 border-b border-surface-200-800 px-3 py-2 text-left hover:bg-surface-100-900"
+		<svg
+			xmlns="http://www.w3.org/2000/svg"
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			stroke-width="2"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+			class="order-last h-4 w-4 shrink-0 transition-transform duration-200 md:order-first"
+			style="transform: rotate({chevronRotation}deg);"
+			aria-hidden="true"
 		>
-			<span class="text-sm font-semibold text-surface-950-50">AI Pane</span>
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="2"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				class="h-4 w-4 transition-transform duration-200"
-				style="transform: rotate({readerController.showAi ? 180 : 0}deg);"
-				aria-hidden="true"
-			>
-				<path d="M6 9l6 6 6-6" />
-			</svg>
-		</button>
-		{#if readerController.showAi}
-			<div class="max-h-[40vh] min-h-0 flex-1 overflow-y-auto">
-				{@render placeholder()}
-			</div>
-		{/if}
-	</aside>
-{:else}
-	<aside
-		aria-label="AI"
-		class="flex shrink-0 flex-col overflow-hidden rounded-md border border-surface-200-800 bg-surface-50-950 transition-[width] duration-200 {readerController.showAi
-			? 'w-80'
-			: 'w-10'}"
+			<path d="M6 9l6 6 6-6" />
+		</svg>
+		<span class="order-first md:order-last md:[writing-mode:vertical-rl]">AI Pane</span>
+	</Collapsible.Trigger>
+	<Collapsible.Content
+		forceMount
+		class="flex max-h-0 min-h-0 flex-col overflow-hidden transition-[max-height,width] duration-200 data-[state=open]:max-h-[60vh] md:max-h-none md:w-0 md:data-[state=open]:w-80"
 	>
-		{#if readerController.showAi}
+		<div class="min-h-0 flex-1 overflow-y-auto">
 			{@render placeholder()}
-		{/if}
-	</aside>
-{/if}
+		</div>
+	</Collapsible.Content>
+</Collapsible.Root>

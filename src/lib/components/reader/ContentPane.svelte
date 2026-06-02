@@ -2,12 +2,8 @@
 	import { readerController } from '$lib/stores/reader.svelte';
 	import EmptyState from './EmptyState.svelte';
 	import PdfViewer from './PdfViewer.svelte';
-	import PaneToggle from './PaneToggle.svelte';
 
 	let viewer = $state<ReturnType<typeof PdfViewer> | undefined>(undefined);
-
-	const navCollapsed = $derived(!readerController.showNav);
-	const aiCollapsed = $derived(!readerController.showAi);
 
 	$effect(() => {
 		readerController.viewerRef = viewer
@@ -17,18 +13,6 @@
 			readerController.viewerRef = null;
 		};
 	});
-
-	function handleNavToggle() {
-		if (readerController.isMobile) {
-			readerController.openMobileNav();
-		} else {
-			readerController.toggleNav();
-		}
-	}
-
-	function handleAiToggle() {
-		readerController.toggleAi();
-	}
 </script>
 
 <section
@@ -38,10 +22,5 @@
 		<EmptyState />
 	{:else}
 		<PdfViewer data={readerController.doc.data} bind:this={viewer} />
-	{/if}
-
-	<PaneToggle side="left" collapsed={navCollapsed} onclick={handleNavToggle} />
-	{#if !readerController.isMobile}
-		<PaneToggle side="right" collapsed={aiCollapsed} onclick={handleAiToggle} />
 	{/if}
 </section>

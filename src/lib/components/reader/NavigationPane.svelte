@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import { Tabs } from '@skeletonlabs/skeleton-svelte';
+	import { Collapsible } from 'bits-ui';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { readerController, type ReaderTab } from '$lib/stores/reader.svelte';
 	import type { PDFDocumentProxy } from 'pdfjs-dist';
@@ -18,7 +19,6 @@
 	let outline = $state<OutlineNode[] | null>(null);
 	let outlineLoading = $state(false);
 	let thumbContainer: HTMLDivElement | undefined = $state();
-	let drawerEl: HTMLDivElement | undefined = $state();
 	let workerSet = false;
 
 	const renderedPages = new SvelteSet<number>();
@@ -26,9 +26,7 @@
 	let activeRenders = 0;
 	const MAX_CONCURRENT = 2;
 
-	const showDesktop = $derived(!readerController.isMobile && readerController.showNav);
-	const showMobileDrawer = $derived(readerController.isMobile && readerController.mobileNavOpen);
-	const renderContents = $derived(showDesktop || showMobileDrawer);
+	const renderContents = $derived(readerController.showNav);
 	const hasDoc = $derived(readerController.doc !== null);
 
 	$effect(() => {
@@ -105,27 +103,6 @@
 		return () => {
 			cancelled = true;
 		};
-	});
-
-	$effect(() => {
-		if (!browser) return;
-		if (readerController.isMobile && readerController.mobileNavOpen) {
-			const prev = document.body.style.overflow;
-			document.body.style.overflow = 'hidden';
-			return () => {
-				document.body.style.overflow = prev;
-			};
-		}
-	});
-
-	$effect(() => {
-		if (!showMobileDrawer) return;
-		const el = drawerEl;
-		if (!el) return;
-		const focusable = el.querySelector<HTMLElement>(
-			'button:not([disabled]), [tabindex]:not([tabindex="-1"])'
-		);
-		focusable?.focus();
 	});
 
 	$effect(() => {
@@ -269,20 +246,14 @@
 	function handleOutlineClick(pageNumber: number | null) {
 		if (pageNumber === null) return;
 		readerController.scrollToPage(pageNumber);
+	}
+
+	const chevronRotation = $derived.by(() => {
 		if (readerController.isMobile) {
-			readerController.closeMobileNav();
+			return readerController.showNav ? 180 : 0;
 		}
-	}
-
-	function closeDrawer() {
-		readerController.closeMobileNav();
-	}
-
-	function handleBackdropKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
-			closeDrawer();
-		}
-	}
+		return readerController.showNav ? -90 : 90;
+	});
 </script>
 
 {#snippet emptyMessage(text: string)}
@@ -382,63 +353,36 @@
 	</Tabs>
 {/snippet}
 
-{#if readerController.isMobile}
-	{#if showMobileDrawer}
-		<div
-			role="button"
-			tabindex="0"
-			aria-label="Close navigation"
-			class="fixed inset-0 z-30 bg-surface-950/40"
-			onclick={closeDrawer}
-			onkeydown={handleBackdropKeydown}
-		></div>
-		<div
-			bind:this={drawerEl}
-			role="dialog"
-			aria-modal="true"
-			aria-label="Navigation"
-			class="fixed inset-x-0 top-0 z-40 max-h-[60vh] overflow-hidden rounded-b-md border-b border-surface-200-800 bg-surface-50-950 shadow-lg"
-		>
-			<div class="flex h-full min-h-0 flex-col">
-				<div class="flex items-center justify-between border-b border-surface-200-800 px-3 py-2">
-					<span class="text-sm font-semibold text-surface-950-50">Navigation</span>
-					<button
-						type="button"
-						onclick={closeDrawer}
-						class="rounded p-1 text-surface-950-50 hover:bg-surface-100-900"
-						aria-label="Close navigation"
-					>
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							class="h-4 w-4"
-							aria-hidden="true"
-						>
-							<path d="M18 6L6 18" />
-							<path d="M6 6l12 12" />
-						</svg>
-					</button>
-				</div>
-				<div class="min-h-0 flex-1">
-					{@render paneContents()}
-				</div>
-			</div>
-		</div>
-	{/if}
-{:else}
-	<aside
-		class="flex shrink-0 flex-col overflow-hidden rounded-md border border-surface-200-800 bg-surface-50-950 transition-[width] duration-200 {readerController.showNav
-			? 'w-64'
-			: 'w-10'}"
-		aria-label="Navigation"
+<Collapsible.Root
+	bind:open={readerController.showNav}
+	aria-label="Navigation"
+	class="flex shrink-0 flex-col overflow-hidden rounded-md border border-surface-200-800 bg-surface-50-950 md:h-full md:flex-row"
+>
+	<Collapsible.Content
+		forceMount
+		class="flex max-h-0 min-h-0 flex-col overflow-hidden transition-[max-height,width] duration-200 data-[state=open]:max-h-[60vh] md:max-h-none md:w-0 md:data-[state=open]:w-64"
 	>
-		{#if readerController.showNav}
+		<div class="min-h-0 flex-1 overflow-hidden">
 			{@render paneContents()}
-		{/if}
-	</aside>
-{/if}
+		</div>
+	</Collapsible.Content>
+	<Collapsible.Trigger
+		class="order-first flex shrink-0 items-center justify-between gap-2 border-b border-surface-200-800 bg-surface-50-950 px-3 py-2 text-sm font-semibold text-surface-950-50 hover:bg-surface-100-900 md:order-last md:flex-col md:justify-center md:gap-1.5 md:border-b-0 md:border-l md:px-2 md:py-3"
+	>
+		<svg
+			xmlns="http://www.w3.org/2000/svg"
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			stroke-width="2"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+			class="order-last h-4 w-4 shrink-0 transition-transform duration-200 md:order-first"
+			style="transform: rotate({chevronRotation}deg);"
+			aria-hidden="true"
+		>
+			<path d="M6 9l6 6 6-6" />
+		</svg>
+		<span class="order-first md:order-last md:[writing-mode:vertical-rl]">Navigation Pane</span>
+	</Collapsible.Trigger>
+</Collapsible.Root>

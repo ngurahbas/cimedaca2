@@ -9,7 +9,6 @@ export type ViewerRef = {
 class ReaderController {
 	showNav = $state(true);
 	showAi = $state(true);
-	mobileNavOpen = $state(false);
 	activeTab = $state<ReaderTab>('thumbs');
 	isMobile = $state(false);
 	doc = $state.raw<{ name: string; data: ArrayBuffer } | null>(null);
@@ -20,12 +19,6 @@ class ReaderController {
 	}
 	toggleAi() {
 		this.showAi = !this.showAi;
-	}
-	openMobileNav() {
-		this.mobileNavOpen = true;
-	}
-	closeMobileNav() {
-		this.mobileNavOpen = false;
 	}
 
 	async openPdfFile(file: File): Promise<void> {
@@ -52,9 +45,5 @@ if (browser) {
 	readerController.isMobile = mql.matches;
 	mql.addEventListener('change', (e) => {
 		readerController.isMobile = e.matches;
-	});
-
-	document.documentElement.addEventListener('keydown', (e) => {
-		if (e.key === 'Escape') readerController.closeMobileNav();
 	});
 }
