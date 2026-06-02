@@ -2,6 +2,10 @@ import { browser } from '$app/environment';
 
 export type ReaderTab = 'thumbs' | 'outline';
 
+export type ViewerRef = {
+	scrollToPage(n: number): void;
+};
+
 class ReaderController {
 	showNav = $state(true);
 	showAi = $state(true);
@@ -9,6 +13,7 @@ class ReaderController {
 	activeTab = $state<ReaderTab>('thumbs');
 	isMobile = $state(false);
 	doc = $state.raw<{ name: string; data: ArrayBuffer } | null>(null);
+	viewerRef = $state.raw<ViewerRef | null>(null);
 
 	toggleNav() {
 		this.showNav = !this.showNav;
@@ -33,6 +38,10 @@ class ReaderController {
 	}
 	clearDoc() {
 		this.doc = null;
+	}
+
+	scrollToPage(n: number): void {
+		this.viewerRef?.scrollToPage(n);
 	}
 }
 

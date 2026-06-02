@@ -6,14 +6,28 @@
 
 	let viewer = $state<ReturnType<typeof PdfViewer> | undefined>(undefined);
 
-	const collapsed = $derived(!readerController.showNav);
+	const navCollapsed = $derived(!readerController.showNav);
+	const aiCollapsed = $derived(!readerController.showAi);
 
-	function handleToggle() {
+	$effect(() => {
+		readerController.viewerRef = viewer
+			? { scrollToPage: (n: number) => viewer?.scrollToPage(n) }
+			: null;
+		return () => {
+			readerController.viewerRef = null;
+		};
+	});
+
+	function handleNavToggle() {
 		if (readerController.isMobile) {
 			readerController.openMobileNav();
 		} else {
 			readerController.toggleNav();
 		}
+	}
+
+	function handleAiToggle() {
+		readerController.toggleAi();
 	}
 </script>
 
@@ -26,5 +40,8 @@
 		<PdfViewer data={readerController.doc.data} bind:this={viewer} />
 	{/if}
 
-	<PaneToggle side="left" {collapsed} onclick={handleToggle} />
+	<PaneToggle side="left" collapsed={navCollapsed} onclick={handleNavToggle} />
+	{#if !readerController.isMobile}
+		<PaneToggle side="right" collapsed={aiCollapsed} onclick={handleAiToggle} />
+	{/if}
 </section>
