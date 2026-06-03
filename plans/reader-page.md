@@ -116,6 +116,7 @@ if (browser) {
 ```
 
 Notes:
+
 - `doc` is `$state.raw` so Svelte 5 doesn't proxy a multi-MB buffer; `PdfViewer` re-renders on change via a keyed effect.
 - Single `openPdfFile(file)` entry point — used by `ReaderMenubar`'s file input, `EmptyState`'s button, and (future) drag-and-drop / URL loading.
 - Esc closes the mobile drawer. No other shortcuts in this phase.

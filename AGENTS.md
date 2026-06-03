@@ -20,11 +20,13 @@ Recommended local verification order: `bun run format` -> `bun run lint` -> `bun
 SvelteKit app using **Svelte 5 runes mode**, forced project-wide for non-`node_modules` files in `svelte.config.js`. UI: Skeleton UI + Tailwind CSS 4 (`@tailwindcss/vite`).
 
 **Routes** (under `src/routes/`):
+
 - `+page.svelte` - home, renders `<ThemeMenu />` only
 - `demo/+page.svelte`, `demo/playwright/+page.svelte` - Skeleton/Playwright demo pages
 - `reader/+page.svelte` - the PDF reader app (assembles `ReaderMenubar`, `NavigationPane`, `ContentPane`, `AiPane`)
 
 **Shared code** (under `src/lib/`):
+
 - `components/` - root components (`ThemeMenu.svelte`, `ThemeMenuMenu.svelte`) and `reader/` subfolder with the reader's pieces
 - `stores/` - rune-based controllers in `*.svelte.ts` files (e.g. `theme.svelte.ts`, `reader.svelte.ts`). They export a singleton instance; rely on `$app/environment` `browser` guard.
 - `assets/` - static assets imported through `$lib` (favicon)
