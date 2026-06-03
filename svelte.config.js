@@ -15,7 +15,7 @@ const config = {
 	// Enables @sveltejs/vite-plugin-svelte-inspector. Hold Alt+X in the browser
 	// to activate inspect mode; click an element to open its source file.
 	vitePlugin: {
-		inspector: { toggleKeyCombo: 'alt+x' }
+		inspector: { toggleKeyCombo: 'alt-x' }
 	}
 };
 
