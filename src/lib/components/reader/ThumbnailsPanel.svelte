@@ -122,7 +122,7 @@
 				data-thumb-item
 				data-page-number={pageNum}
 				onclick={() => readerController.scrollToPage(pageNum)}
-				class="flex flex-col items-center gap-1 self-center rounded border border-surface-200-800 bg-white p-1 shadow-sm transition-colors hover:border-primary-500"
+				class="flex flex-col items-center gap-1 self-center rounded-sm border border-surface-200-800 bg-white p-1 shadow-sm transition-colors hover:border-primary-500"
 			>
 				<canvas class="block bg-white" style="width: 120px;" aria-label={`Page ${pageNum}`}
 				></canvas>

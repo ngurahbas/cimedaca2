@@ -7,7 +7,7 @@
 
 <Menubar.Menu>
 	<Menubar.Trigger
-		class="flex items-center justify-center rounded px-3 py-1.5 text-sm font-medium text-surface-950-50 outline-none select-none hover:bg-surface-100-900 focus-visible:bg-surface-100-900 data-[state=open]:bg-surface-100-900"
+		class="flex items-center justify-center rounded-sm px-3 py-1.5 text-sm font-medium text-surface-950-50 outline-none select-none hover:bg-surface-100-900 focus-visible:bg-surface-100-900 data-[state=open]:bg-surface-100-900"
 	>
 		Theme
 	</Menubar.Trigger>
@@ -25,7 +25,7 @@
 				{#each THEMES as t (t)}
 					<Menubar.RadioItem
 						value={t}
-						class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm text-surface-950-50 outline-none select-none data-[disabled]:opacity-50 data-[highlighted]:bg-surface-100-900"
+						class="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-surface-950-50 outline-none select-none data-[disabled]:opacity-50 data-[highlighted]:bg-surface-100-900"
 					>
 						{#snippet children({ checked })}
 							<span

@@ -178,13 +178,13 @@
 			<Tabs.List class="flex shrink-0 items-center gap-1 border-b border-surface-200-800 p-1">
 				<Tabs.Trigger
 					value="thumbs"
-					class="flex-1 rounded px-2 py-1.5 text-sm font-medium text-surface-950-50 outline-none hover:bg-surface-100-900 focus-visible:bg-surface-100-900 data-[selected]:bg-primary-500/15 data-[selected]:text-primary-500"
+					class="flex-1 rounded-sm px-2 py-1.5 text-sm font-medium text-surface-950-50 outline-none hover:bg-surface-100-900 focus-visible:bg-surface-100-900 data-[selected]:bg-primary-500/15 data-[selected]:text-primary-500"
 				>
 					Thumbnails
 				</Tabs.Trigger>
 				<Tabs.Trigger
 					value="outline"
-					class="flex-1 rounded px-2 py-1.5 text-sm font-medium text-surface-950-50 outline-none hover:bg-surface-100-900 focus-visible:bg-surface-100-900 data-[selected]:bg-primary-500/15 data-[selected]:text-primary-500"
+					class="flex-1 rounded-sm px-2 py-1.5 text-sm font-medium text-surface-950-50 outline-none hover:bg-surface-100-900 focus-visible:bg-surface-100-900 data-[selected]:bg-primary-500/15 data-[selected]:text-primary-500"
 				>
 					Outline
 				</Tabs.Trigger>

@@ -144,7 +144,7 @@
 		<div class="mx-auto flex max-w-3xl flex-col items-center gap-4">
 			{#each Array.from({ length: pageCount }, (_, i) => i + 1) as pageNum (pageNum)}
 				<div data-page-number={pageNum} class="flex w-full flex-col items-center gap-1">
-					<canvas data-page-canvas={pageNum} class="w-full rounded-sm bg-white shadow"></canvas>
+					<canvas data-page-canvas={pageNum} class="w-full rounded-sm bg-white shadow-sm"></canvas>
 					<span class="text-xs opacity-60">Page {pageNum}</span>
 				</div>
 			{/each}

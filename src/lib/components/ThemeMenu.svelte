@@ -9,7 +9,7 @@
 >
 	<ThemeMenuMenu />
 
-	<div class="flex items-center gap-2 rounded px-3 py-1.5 hover:bg-surface-100-900">
+	<div class="flex items-center gap-2 rounded-sm px-3 py-1.5 hover:bg-surface-100-900">
 		<span class="text-sm font-medium text-surface-950-50 select-none">Dark mode</span>
 		<Switch.Root
 			checked={themeController.isDark}

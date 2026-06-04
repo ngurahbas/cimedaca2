@@ -28,7 +28,7 @@
 			type="button"
 			disabled={node.pageNumber === null}
 			onclick={() => handleClick(node.pageNumber)}
-			class="flex w-full items-start gap-1 rounded px-2 py-1 text-left text-sm hover:bg-surface-100-900 disabled:cursor-default disabled:opacity-60 disabled:hover:bg-transparent"
+			class="flex w-full items-start gap-1 rounded-sm px-2 py-1 text-left text-sm hover:bg-surface-100-900 disabled:cursor-default disabled:opacity-60 disabled:hover:bg-transparent"
 			style="padding-left: {indent + 8}px;"
 		>
 			<span class="truncate" title={node.title}>

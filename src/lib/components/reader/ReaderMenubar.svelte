@@ -29,7 +29,7 @@
 
 	<Menubar.Menu>
 		<Menubar.Trigger
-			class="flex items-center justify-center rounded px-3 py-1.5 text-sm font-medium text-surface-950-50 outline-none select-none hover:bg-surface-100-900 focus-visible:bg-surface-100-900 data-[state=open]:bg-surface-100-900"
+			class="flex items-center justify-center rounded-sm px-3 py-1.5 text-sm font-medium text-surface-950-50 outline-none select-none hover:bg-surface-100-900 focus-visible:bg-surface-100-900 data-[state=open]:bg-surface-100-900"
 		>
 			File
 		</Menubar.Trigger>
@@ -41,7 +41,7 @@
 			>
 				<Menubar.Item
 					onSelect={() => fileInput?.click()}
-					class="flex cursor-pointer items-center rounded px-2 py-1.5 text-sm text-surface-950-50 outline-none select-none data-[disabled]:opacity-50 data-[highlighted]:bg-surface-100-900"
+					class="flex cursor-pointer items-center rounded-sm px-2 py-1.5 text-sm text-surface-950-50 outline-none select-none data-[disabled]:opacity-50 data-[highlighted]:bg-surface-100-900"
 				>
 					Open…
 				</Menubar.Item>
@@ -51,7 +51,7 @@
 
 	<Menubar.Menu>
 		<Menubar.Trigger
-			class="flex items-center justify-center rounded px-3 py-1.5 text-sm font-medium text-surface-950-50 outline-none select-none hover:bg-surface-100-900 focus-visible:bg-surface-100-900 data-[state=open]:bg-surface-100-900"
+			class="flex items-center justify-center rounded-sm px-3 py-1.5 text-sm font-medium text-surface-950-50 outline-none select-none hover:bg-surface-100-900 focus-visible:bg-surface-100-900 data-[state=open]:bg-surface-100-900"
 		>
 			View
 		</Menubar.Trigger>
@@ -62,7 +62,7 @@
 				sideOffset={6}
 			>
 				<div
-					class="flex items-center justify-between gap-3 rounded px-2 py-1.5 text-sm text-surface-950-50 select-none"
+					class="flex items-center justify-between gap-3 rounded-sm px-2 py-1.5 text-sm text-surface-950-50 select-none"
 				>
 					<span>Navigation pane</span>
 					<Switch.Root
@@ -76,7 +76,7 @@
 					</Switch.Root>
 				</div>
 				<div
-					class="flex items-center justify-between gap-3 rounded px-2 py-1.5 text-sm text-surface-950-50 select-none"
+					class="flex items-center justify-between gap-3 rounded-sm px-2 py-1.5 text-sm text-surface-950-50 select-none"
 				>
 					<span>AI pane</span>
 					<Switch.Root
@@ -95,7 +95,7 @@
 
 	<ThemeMenuMenu />
 
-	<div class="flex items-center gap-2 rounded px-3 py-1.5 hover:bg-surface-100-900">
+	<div class="flex items-center gap-2 rounded-sm px-3 py-1.5 hover:bg-surface-100-900">
 		<span class="text-sm font-medium text-surface-950-50 select-none">Dark mode</span>
 		<Switch.Root
 			checked={themeController.isDark}
