@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
-	import type { PDFDocumentProxy, PDFPageProxy, PageViewport } from 'pdfjs-dist';
+	import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 
 	type Props = {
 		data: ArrayBuffer;
@@ -83,20 +83,15 @@
 		const ctx = canvas.getContext('2d');
 		if (!ctx) return;
 
-		const cssWidth = canvas.clientWidth;
 		const dpr = window.devicePixelRatio || 1;
-		canvas.width = Math.floor(cssWidth * dpr);
-		canvas.height = Math.floor((canvas.clientHeight || canvas.width) * dpr);
-
 		const viewport = page.getViewport({ scale: 1 });
-		const scale = cssWidth / viewport.width;
-		const scaledViewport: PageViewport = page.getViewport({ scale });
 
-		canvas.style.height = `${scaledViewport.height}px`;
-		canvas.height = Math.floor(scaledViewport.height * dpr);
-		canvas.width = Math.floor(scaledViewport.width * dpr);
+		canvas.style.width = `${viewport.width}px`;
+		canvas.style.height = `${viewport.height}px`;
+		canvas.width = Math.floor(viewport.width * dpr);
+		canvas.height = Math.floor(viewport.height * dpr);
 
-		await page.render({ canvas, canvasContext: ctx, viewport: scaledViewport }).promise;
+		await page.render({ canvas, canvasContext: ctx, viewport }).promise;
 	}
 
 	$effect(() => {
@@ -140,11 +135,11 @@
 		</div>
 	</div>
 {:else}
-	<div bind:this={scrollEl} class="h-full w-full overflow-y-auto bg-surface-100-900 p-4">
-		<div class="mx-auto flex max-w-3xl flex-col items-center gap-4">
+	<div bind:this={scrollEl} class="h-full w-full overflow-auto bg-surface-100-900 p-4">
+		<div class="mx-auto flex flex-col items-center gap-4">
 			{#each Array.from({ length: pageCount }, (_, i) => i + 1) as pageNum (pageNum)}
 				<div data-page-number={pageNum} class="flex w-full flex-col items-center gap-1">
-					<canvas data-page-canvas={pageNum} class="w-full rounded-sm bg-white shadow-sm"></canvas>
+					<canvas data-page-canvas={pageNum} class="rounded-sm bg-white shadow-sm"></canvas>
 					<span class="text-xs opacity-60">Page {pageNum}</span>
 				</div>
 			{/each}
