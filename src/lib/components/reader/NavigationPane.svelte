@@ -169,34 +169,32 @@
 		forceMount
 		class="flex max-h-0 min-h-0 flex-col overflow-hidden transition-[max-height,width] duration-200 data-[state=open]:max-h-[60vh] md:max-h-none md:w-0 md:data-[state=open]:w-64"
 	>
-		<div class="min-h-0 flex-1 overflow-hidden">
-			<Tabs
-				value={readerController.activeTab}
-				onValueChange={(d) => handleTabChange(d.value)}
-				class="flex h-full min-h-0 w-full flex-col"
-			>
-				<Tabs.List class="flex shrink-0 items-center gap-1 border-b border-surface-200-800 p-1">
-					<Tabs.Trigger
-						value="thumbs"
-						class="flex-1 rounded px-2 py-1.5 text-sm font-medium text-surface-950-50 outline-none hover:bg-surface-100-900 focus-visible:bg-surface-100-900 data-[selected]:bg-primary-500/15 data-[selected]:text-primary-500"
-					>
-						Thumbnails
-					</Tabs.Trigger>
-					<Tabs.Trigger
-						value="outline"
-						class="flex-1 rounded px-2 py-1.5 text-sm font-medium text-surface-950-50 outline-none hover:bg-surface-100-900 focus-visible:bg-surface-100-900 data-[selected]:bg-primary-500/15 data-[selected]:text-primary-500"
-					>
-						Outline
-					</Tabs.Trigger>
-				</Tabs.List>
-				<Tabs.Content value="thumbs" class="min-h-0 flex-1 overflow-hidden">
-					<ThumbnailsPanel {pdfDoc} {pageCount} {hasDoc} />
-				</Tabs.Content>
-				<Tabs.Content value="outline" class="min-h-0 flex-1 overflow-hidden">
-					<OutlinePanel {outline} {outlineLoading} {hasDoc} />
-				</Tabs.Content>
-			</Tabs>
-		</div>
+		<Tabs
+			value={readerController.activeTab}
+			onValueChange={(d) => handleTabChange(d.value)}
+			class="flex h-full min-h-0 w-full flex-col"
+		>
+			<Tabs.List class="flex shrink-0 items-center gap-1 border-b border-surface-200-800 p-1">
+				<Tabs.Trigger
+					value="thumbs"
+					class="flex-1 rounded px-2 py-1.5 text-sm font-medium text-surface-950-50 outline-none hover:bg-surface-100-900 focus-visible:bg-surface-100-900 data-[selected]:bg-primary-500/15 data-[selected]:text-primary-500"
+				>
+					Thumbnails
+				</Tabs.Trigger>
+				<Tabs.Trigger
+					value="outline"
+					class="flex-1 rounded px-2 py-1.5 text-sm font-medium text-surface-950-50 outline-none hover:bg-surface-100-900 focus-visible:bg-surface-100-900 data-[selected]:bg-primary-500/15 data-[selected]:text-primary-500"
+				>
+					Outline
+				</Tabs.Trigger>
+			</Tabs.List>
+			<Tabs.Content value="thumbs" class="min-h-0 flex-1 overflow-hidden">
+				<ThumbnailsPanel {pdfDoc} {pageCount} {hasDoc} />
+			</Tabs.Content>
+			<Tabs.Content value="outline" class="min-h-0 flex-1 overflow-hidden">
+				<OutlinePanel {outline} {outlineLoading} {hasDoc} />
+			</Tabs.Content>
+		</Tabs>
 	</Collapsible.Content>
 	<Collapsible.Trigger
 		class="order-first flex shrink-0 items-center justify-between gap-2 border-b border-surface-200-800 bg-surface-50-950 px-3 py-2 text-sm font-semibold text-surface-950-50 hover:bg-surface-100-900 md:order-last md:flex-col md:justify-center md:gap-1.5 md:border-b-0 md:border-l md:px-2 md:py-3"
