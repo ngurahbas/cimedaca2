@@ -21,14 +21,17 @@ This `+1` was correct for **Svelte 4**, where `__svelte_meta.loc.line` was 0-ind
 ## Evidence
 
 1. **`node_modules/svelte/src/compiler/state.js:57`** — locator configured with `offsetLine: 1`:
+
    ```js
    const l = getLocator(source, { offsetLine: 1 });
    ```
 
 2. **`node_modules/svelte/src/internal/client/dev/elements.js:33`** — `__svelte_meta.loc` stores the locator output directly:
+
    ```js
    loc: { file: filename, line: location[0], column: location[1] }
    ```
+
    Since `location[0]` comes from the locator (which returns 1-indexed lines), `__svelte_meta.loc.line` is 1-indexed.
 
 3. **`node_modules/@sveltejs/vite-plugin-svelte/src/plugins/inspector/runtime/Inspector.svelte:120`** — double-adds 1:
