@@ -163,11 +163,12 @@
 <Collapsible.Root
 	bind:open={readerController.showNav}
 	aria-label="Navigation"
-	class="flex shrink-0 flex-col overflow-hidden rounded-md border border-surface-200-800 bg-surface-50-950 md:h-full md:flex-row"
+	class="grid shrink-0 overflow-hidden rounded-md border border-surface-200-800 bg-surface-50-950 transition-[grid-template-rows] duration-200 ease-in-out md:flex md:h-full md:flex-row md:transition-none"
+	style="grid-template-rows: auto {readerController.showNav ? '1fr' : '0fr'};"
 >
 	<Collapsible.Content
 		forceMount
-		class="flex max-h-0 min-h-0 flex-col overflow-hidden transition-[max-height,width] duration-200 data-[state=open]:max-h-[60vh] md:max-h-none md:w-0 md:data-[state=open]:w-64"
+		class="flex min-h-0 flex-col overflow-hidden md:w-0 md:transition-[width] md:duration-200 md:ease-in-out md:data-[state=open]:w-64"
 	>
 		<Tabs
 			value={readerController.activeTab}
