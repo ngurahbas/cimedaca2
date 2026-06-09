@@ -126,7 +126,7 @@
 			>
 				<canvas class="block bg-white" style="width: 120px;" aria-label={`Page ${pageNum}`}
 				></canvas>
-				<span class="rounded bg-surface-100-900 px-1.5 text-xs opacity-70">Page {pageNum}</span>
+				<span class="rounded-sm bg-surface-100-900 px-1.5 text-xs opacity-70">Page {pageNum}</span>
 			</button>
 		{/each}
 	</div>

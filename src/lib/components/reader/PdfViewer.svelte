@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { SvelteSet } from 'svelte/reactivity';
 	import { browser } from '$app/environment';
-	import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
+	import { readerController } from '$lib/stores/reader.svelte';
+	import type { PDFDocumentProxy, PDFPageProxy, RenderTask } from 'pdfjs-dist';
 
 	type Props = {
 		data: ArrayBuffer;
@@ -18,6 +20,16 @@
 	let pageCount = $state(0);
 
 	let workerSet = false;
+
+	function handleWheel(e: WheelEvent) {
+		if (!e.ctrlKey && !e.metaKey) return;
+		e.preventDefault();
+		if (e.deltaY < 0) {
+			readerController.zoomIn();
+		} else if (e.deltaY > 0) {
+			readerController.zoomOut();
+		}
+	}
 
 	function scrollToPage(n: number) {
 		if (!scrollEl) return;
@@ -78,22 +90,28 @@
 		};
 	});
 
-	async function renderPage(page: PDFPageProxy, canvas: HTMLCanvasElement) {
-		if (!browser) return;
+	function renderPage(
+		page: PDFPageProxy,
+		canvas: HTMLCanvasElement,
+		scale: number
+	): RenderTask | null {
+		if (!browser) return null;
 		const ctx = canvas.getContext('2d');
-		if (!ctx) return;
+		if (!ctx) return null;
 
 		const dpr = window.devicePixelRatio || 1;
-		const viewport = page.getViewport({ scale: 1 });
+		const viewport = page.getViewport({ scale });
 
 		canvas.style.width = `${viewport.width}px`;
 		canvas.style.height = `${viewport.height}px`;
 		canvas.width = Math.floor(viewport.width * dpr);
 		canvas.height = Math.floor(viewport.height * dpr);
 
-		await page.render({ canvas, canvasContext: ctx, viewport }).promise;
+		ctx.setTransform(1, 0, 0, 1, 0, 0);
+		ctx.clearRect(0, 0, canvas.width, canvas.height);
+
 		const transform = dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : undefined;
-		await page.render({ canvas, canvasContext: ctx, viewport, transform }).promise;
+		return page.render({ canvas, canvasContext: ctx, viewport, transform });
 	}
 
 	$effect(() => {
@@ -102,17 +120,41 @@
 		const root = scrollEl;
 		if (!root) return;
 
+		const scale = readerController.zoomScale;
+
+		const activeTasks = new SvelteSet<RenderTask>();
+		let cancelled = false;
+
 		const canvases = root.querySelectorAll<HTMLCanvasElement>('canvas[data-page-canvas]');
-		const pagePromises: Promise<void>[] = [];
 		canvases.forEach((canvas) => {
 			const pageNum = Number(canvas.dataset.pageCanvas);
 			if (!pageNum) return;
-			const pagePromise = doc.getPage(pageNum).then((page) => renderPage(page, canvas));
-			pagePromises.push(pagePromise);
+			void doc.getPage(pageNum).then((page) => {
+				if (cancelled) return;
+				const task = renderPage(page, canvas, scale);
+				if (task) {
+					activeTasks.add(task);
+					task.promise
+						.then(() => {
+							activeTasks.delete(task);
+						})
+						.catch(() => {
+							activeTasks.delete(task);
+						});
+				}
+			});
 		});
 
 		return () => {
-			pagePromises.forEach(() => {});
+			cancelled = true;
+			activeTasks.forEach((task) => {
+				try {
+					task.cancel();
+				} catch {
+					/* ignore */
+				}
+			});
+			activeTasks.clear();
 		};
 	});
 </script>
@@ -137,7 +179,11 @@
 		</div>
 	</div>
 {:else}
-	<div bind:this={scrollEl} class="h-full w-full overflow-auto bg-surface-100-900 p-4">
+	<div
+		bind:this={scrollEl}
+		class="h-full w-full overflow-auto bg-surface-100-900 p-4"
+		onwheel={handleWheel}
+	>
 		<div class="mx-auto flex flex-col items-center gap-4">
 			{#each Array.from({ length: pageCount }, (_, i) => i + 1) as pageNum (pageNum)}
 				<div data-page-number={pageNum} class="flex w-full flex-col items-center gap-1">

@@ -14,6 +14,30 @@ class ReaderController {
 	doc = $state.raw<{ name: string; data: ArrayBuffer } | null>(null);
 	viewerRef = $state.raw<ViewerRef | null>(null);
 
+	zoomScale = $state(1.0);
+	zoomStep = 0.1;
+	zoomMin = 0.25;
+	zoomMax = 4.0;
+
+	zoomIn() {
+		this.zoomScale = Math.min(
+			this.zoomMax,
+			Math.round((this.zoomScale + this.zoomStep) * 100) / 100
+		);
+	}
+	zoomOut() {
+		this.zoomScale = Math.max(
+			this.zoomMin,
+			Math.round((this.zoomScale - this.zoomStep) * 100) / 100
+		);
+	}
+	setZoom(n: number) {
+		this.zoomScale = Math.max(this.zoomMin, Math.min(this.zoomMax, Math.round(n * 100) / 100));
+	}
+	resetZoom() {
+		this.zoomScale = 1.0;
+	}
+
 	toggleNav() {
 		this.showNav = !this.showNav;
 	}
@@ -45,5 +69,26 @@ if (browser) {
 	readerController.isMobile = mql.matches;
 	mql.addEventListener('change', (e) => {
 		readerController.isMobile = e.matches;
+	});
+
+	document.addEventListener('keydown', (e) => {
+		if (!e.ctrlKey && !e.metaKey) return;
+		const target = e.target as HTMLElement;
+		if (
+			target &&
+			(target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+		)
+			return;
+
+		if (e.key === '+' || e.key === '=' || e.key === 'NumpadAdd') {
+			e.preventDefault();
+			readerController.zoomIn();
+		} else if (e.key === '-' || e.key === 'NumpadSubtract') {
+			e.preventDefault();
+			readerController.zoomOut();
+		} else if (e.key === '0' || e.key === 'Numpad0') {
+			e.preventDefault();
+			readerController.resetZoom();
+		}
 	});
 }
