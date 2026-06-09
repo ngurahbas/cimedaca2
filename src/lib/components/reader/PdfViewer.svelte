@@ -93,8 +93,7 @@
 
 		await page.render({ canvas, canvasContext: ctx, viewport }).promise;
 		const transform = dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : undefined;
-		await page.render({ canvas, canvasContext: ctx, viewport, transform })
-			.promise;
+		await page.render({ canvas, canvasContext: ctx, viewport, transform }).promise;
 	}
 
 	$effect(() => {
