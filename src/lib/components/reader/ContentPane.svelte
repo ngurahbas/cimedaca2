@@ -2,6 +2,7 @@
 	import { readerController } from '$lib/stores/reader.svelte';
 	import EmptyState from './EmptyState.svelte';
 	import PdfViewer from './PdfViewer.svelte';
+	import ZoomControls from './ZoomControls.svelte';
 
 	let viewer = $state<ReturnType<typeof PdfViewer> | undefined>(undefined);
 
@@ -22,5 +23,6 @@
 		<EmptyState />
 	{:else}
 		<PdfViewer data={readerController.doc.data} bind:this={viewer} />
+		<ZoomControls />
 	{/if}
 </section>

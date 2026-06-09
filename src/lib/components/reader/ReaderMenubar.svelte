@@ -93,33 +93,6 @@
 		</Menubar.Portal>
 	</Menubar.Menu>
 
-	<div class="flex items-center gap-1 rounded-sm px-2 py-1 hover:bg-surface-100-900">
-		<button
-			onclick={() => readerController.zoomOut()}
-			class="flex h-6 w-6 items-center justify-center rounded-sm text-sm font-medium text-surface-950-50 outline-none select-none hover:bg-surface-200-800 focus-visible:bg-surface-200-800"
-			aria-label="Zoom out"
-		>
-			−
-		</button>
-		<span class="min-w-[3.5rem] text-center text-sm font-medium text-surface-950-50 select-none">
-			{Math.round(readerController.zoomScale * 100)}%
-		</span>
-		<button
-			onclick={() => readerController.zoomIn()}
-			class="flex h-6 w-6 items-center justify-center rounded-sm text-sm font-medium text-surface-950-50 outline-none select-none hover:bg-surface-200-800 focus-visible:bg-surface-200-800"
-			aria-label="Zoom in"
-		>
-			+
-		</button>
-		<button
-			onclick={() => readerController.resetZoom()}
-			class="flex h-6 items-center justify-center rounded-sm px-1.5 text-xs font-medium text-surface-950-50 outline-none select-none hover:bg-surface-200-800 focus-visible:bg-surface-200-800"
-			aria-label="Reset zoom"
-		>
-			Reset
-		</button>
-	</div>
-
 	<ThemeMenuMenu />
 
 	<div class="flex items-center gap-2 rounded-sm px-3 py-1.5 hover:bg-surface-100-900">
