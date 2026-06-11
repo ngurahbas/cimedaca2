@@ -3,7 +3,7 @@
 	import { SvelteSet } from 'svelte/reactivity';
 	import { browser } from '$app/environment';
 	import { readerController } from '$lib/stores/reader.svelte';
-	import type { PDFDocumentProxy, PDFPageProxy, RenderTask } from 'pdfjs-dist';
+	import type { PDFDocumentProxy, PDFPageProxy, RenderTask, TextLayer } from 'pdfjs-dist';
 
 	type Props = {
 		data: ArrayBuffer;
@@ -20,6 +20,7 @@
 	let pageCount = $state(0);
 
 	let workerSet = false;
+	let pdfjsModule: typeof import('pdfjs-dist') | null = null;
 
 	function handleWheel(e: WheelEvent) {
 		if (!e.ctrlKey && !e.metaKey) return;
@@ -51,6 +52,7 @@
 		(async () => {
 			try {
 				const pdfjs = await import('pdfjs-dist');
+				pdfjsModule = pdfjs;
 				if (!workerSet) {
 					pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 						'pdfjs-dist/build/pdf.worker.min.mjs',
@@ -115,35 +117,65 @@
 	}
 
 	$effect(() => {
-		if (status !== 'ready' || !pdfDocument) return;
+		if (status !== 'ready' || !pdfDocument || !pdfjsModule) return;
 		const doc = pdfDocument;
+		const pdfjs = pdfjsModule;
 		const root = scrollEl;
 		if (!root) return;
 
 		const scale = readerController.zoomScale;
 
 		const activeTasks = new SvelteSet<RenderTask>();
+		const activeTextLayers: Array<{ textLayer: TextLayer | null; cancelled: boolean }> = [];
 		let cancelled = false;
 
-		const canvases = root.querySelectorAll<HTMLCanvasElement>('canvas[data-page-canvas]');
-		canvases.forEach((canvas) => {
-			const pageNum = Number(canvas.dataset.pageCanvas);
-			if (!pageNum) return;
-			void doc.getPage(pageNum).then((page) => {
+		for (let pageNum = 1; pageNum <= pageCount; pageNum++) {
+			const canvas = root.querySelector<HTMLCanvasElement>(`canvas[data-page-canvas="${pageNum}"]`);
+			const textContainer = root.querySelector<HTMLDivElement>(`div[data-page-text="${pageNum}"]`);
+			if (!canvas || !textContainer) continue;
+
+			void doc.getPage(pageNum).then(async (page) => {
 				if (cancelled) return;
+
+				const viewport = page.getViewport({ scale });
+
+				// Render canvas
 				const task = renderPage(page, canvas, scale);
 				if (task) {
 					activeTasks.add(task);
-					task.promise
-						.then(() => {
-							activeTasks.delete(task);
-						})
-						.catch(() => {
-							activeTasks.delete(task);
-						});
+					task.promise.then(() => activeTasks.delete(task)).catch(() => activeTasks.delete(task));
+				}
+
+				// Render text layer
+				const textLayerEntry = { textLayer: null as TextLayer | null, cancelled: false };
+				activeTextLayers.push(textLayerEntry);
+
+				try {
+					const textContent = await page.getTextContent();
+					if (cancelled || textLayerEntry.cancelled) return;
+
+					// Set CSS scale variables for text layer font sizing
+					textContainer.style.setProperty('--scale-factor', String(viewport.scale));
+					textContainer.style.setProperty('--user-unit', '1');
+					textContainer.style.setProperty(
+						'--total-scale-factor',
+						'calc(var(--scale-factor) * var(--user-unit))'
+					);
+
+					const textLayer = new pdfjs.TextLayer({
+						textContentSource: textContent,
+						container: textContainer,
+						viewport
+					});
+
+					textLayerEntry.textLayer = textLayer;
+					await textLayer.render();
+				} catch (err) {
+					if (cancelled || textLayerEntry.cancelled) return;
+					console.error(`Text layer render failed for page ${pageNum}:`, err);
 				}
 			});
-		});
+		}
 
 		return () => {
 			cancelled = true;
@@ -155,6 +187,25 @@
 				}
 			});
 			activeTasks.clear();
+
+			activeTextLayers.forEach((entry) => {
+				entry.cancelled = true;
+				if (entry.textLayer) {
+					try {
+						entry.textLayer.cancel();
+					} catch {
+						/* ignore */
+					}
+				}
+			});
+
+			if (root) {
+				const textContainers = root.querySelectorAll<HTMLDivElement>('div[data-page-text]');
+				textContainers.forEach((tc) => {
+					tc.innerHTML = '';
+					tc.style.cssText = '';
+				});
+			}
 		};
 	});
 </script>
@@ -187,10 +238,72 @@
 		<div class="mx-auto flex flex-col items-center gap-4">
 			{#each Array.from({ length: pageCount }, (_, i) => i + 1) as pageNum (pageNum)}
 				<div data-page-number={pageNum} class="flex w-full flex-col items-center gap-1">
-					<canvas data-page-canvas={pageNum} class="rounded-sm bg-white shadow-sm"></canvas>
+					<div class="relative">
+						<canvas data-page-canvas={pageNum} class="rounded-sm bg-white shadow-sm"></canvas>
+						<div data-page-text={pageNum} class="textLayer absolute inset-0 overflow-clip"></div>
+					</div>
 					<span class="text-xs opacity-60">Page {pageNum}</span>
 				</div>
 			{/each}
 		</div>
 	</div>
 {/if}
+
+<style>
+	.textLayer {
+		position: absolute;
+		text-align: initial;
+		inset: 0;
+		overflow: clip;
+		opacity: 1;
+		line-height: 1;
+		letter-spacing: normal;
+		word-spacing: normal;
+		text-size-adjust: none;
+		forced-color-adjust: none;
+		transform-origin: 0 0;
+		caret-color: CanvasText;
+		z-index: 0;
+		--scale-factor: 1;
+		--user-unit: 1;
+		--total-scale-factor: calc(var(--scale-factor) * var(--user-unit));
+		--min-font-size: 1;
+		--text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+		--min-font-size-inv: calc(1 / var(--min-font-size));
+	}
+
+	.textLayer :global(span),
+	.textLayer :global(br) {
+		color: transparent;
+		position: absolute;
+		white-space: pre;
+		cursor: text;
+		transform-origin: 0% 0%;
+		user-select: text;
+		-webkit-user-select: text;
+	}
+
+	.textLayer :global(> :not(.markedContent)),
+	.textLayer :global(.markedContent span:not(.markedContent)) {
+		z-index: 1;
+		--font-height: 0;
+		font-size: calc(var(--text-scale-factor) * var(--font-height));
+		--scale-x: 1;
+		--rotate: 0deg;
+		transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+	}
+
+	.textLayer :global(.markedContent) {
+		display: contents;
+	}
+
+	.textLayer :global(span[role='img']) {
+		user-select: none;
+		cursor: default;
+	}
+
+	.textLayer :global(::selection) {
+		background: color-mix(in srgb, AccentColor, transparent 50%);
+		color: transparent;
+	}
+</style>

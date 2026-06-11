@@ -28,7 +28,8 @@ export default defineConfig(
 		},
 		rules: {
 			'better-tailwindcss/enforce-consistent-line-wrapping': 'off',
-			'better-tailwindcss/enforce-canonical-classes': 'off'
+			'better-tailwindcss/enforce-canonical-classes': 'off',
+			'better-tailwindcss/no-unknown-classes': 'off'
 		}
 	},
 	{
