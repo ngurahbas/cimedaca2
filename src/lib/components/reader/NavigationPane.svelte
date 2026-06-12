@@ -152,68 +152,140 @@
 		}
 	}
 
-	const chevronRotation = $derived.by(() => {
-		if (readerController.isMobile) {
-			return readerController.showNav ? 180 : 0;
+	// Mobile drawer: close on Escape
+	$effect(() => {
+		if (!readerController.isMobile) return;
+		if (!readerController.showNav) return;
+
+		function onKeydown(e: KeyboardEvent) {
+			if (e.key === 'Escape') {
+				readerController.showNav = false;
+			}
 		}
-		return readerController.showNav ? -90 : 90;
+		document.addEventListener('keydown', onKeydown);
+		return () => document.removeEventListener('keydown', onKeydown);
 	});
+
+	// Mobile drawer: lock body scroll
+	$effect(() => {
+		if (!readerController.isMobile) return;
+		if (readerController.showNav) {
+			document.body.style.overflow = 'hidden';
+		} else {
+			document.body.style.overflow = '';
+		}
+		return () => {
+			document.body.style.overflow = '';
+		};
+	});
+
+	const desktopChevronRotation = $derived(readerController.showNav ? -90 : 90);
 </script>
 
-<Collapsible.Root
-	bind:open={readerController.showNav}
-	aria-label="Navigation"
-	class="grid shrink-0 overflow-hidden rounded-md border border-surface-200-800 bg-surface-50-950 transition-[grid-template-rows] duration-200 ease-in-out md:flex md:h-full md:flex-row md:transition-none"
-	style="grid-template-rows: auto {readerController.showNav ? '1fr' : '0fr'};"
->
-	<Collapsible.Content
-		forceMount
-		class="flex min-h-0 flex-col overflow-hidden md:w-0 md:transition-[width] md:duration-200 md:ease-in-out md:data-[state=open]:w-64"
-	>
-		<Tabs
-			value={readerController.activeTab}
-			onValueChange={(d) => handleTabChange(d.value)}
-			class="flex h-full min-h-0 w-full flex-col"
+{#if readerController.isMobile}
+	{#if readerController.showNav}
+		<!-- Backdrop -->
+		<button
+			class="absolute inset-0 z-30 cursor-default bg-black/30"
+			onclick={() => (readerController.showNav = false)}
+			aria-label="Close navigation"
+		></button>
+
+		<!-- Drawer -->
+		<div
+			class="absolute inset-x-0 top-0 z-40 flex max-h-[60vh] flex-col overflow-hidden rounded-b-md border border-surface-200-800 bg-surface-50-950 shadow-lg"
 		>
-			<Tabs.List class="flex shrink-0 items-center gap-1 border-b border-surface-200-800 p-1">
-				<Tabs.Trigger
-					value="thumbs"
-					class="flex-1 rounded-sm px-2 py-1.5 text-sm font-medium text-surface-950-50 outline-none hover:bg-surface-100-900 focus-visible:bg-surface-100-900 data-[selected]:bg-primary-500/15 data-[selected]:text-primary-500"
+			<div
+				class="flex shrink-0 items-center justify-between border-b border-surface-200-800 px-3 py-2"
+			>
+				<span class="text-sm font-semibold text-surface-950-50">Navigation</span>
+				<button
+					onclick={() => (readerController.showNav = false)}
+					class="flex h-7 w-7 items-center justify-center rounded-full text-surface-950-50 hover:bg-surface-100-900"
+					aria-label="Close navigation"
 				>
-					Thumbnails
-				</Tabs.Trigger>
-				<Tabs.Trigger
-					value="outline"
-					class="flex-1 rounded-sm px-2 py-1.5 text-sm font-medium text-surface-950-50 outline-none hover:bg-surface-100-900 focus-visible:bg-surface-100-900 data-[selected]:bg-primary-500/15 data-[selected]:text-primary-500"
-				>
-					Outline
-				</Tabs.Trigger>
-			</Tabs.List>
-			<Tabs.Content value="thumbs" class="min-h-0 flex-1 overflow-hidden">
-				<ThumbnailsPanel {pdfDoc} {pageCount} {hasDoc} />
-			</Tabs.Content>
-			<Tabs.Content value="outline" class="min-h-0 flex-1 overflow-hidden">
-				<OutlinePanel {outline} {outlineLoading} {hasDoc} />
-			</Tabs.Content>
-		</Tabs>
-	</Collapsible.Content>
-	<Collapsible.Trigger
-		class="order-first flex shrink-0 items-center justify-between gap-2 border-b border-surface-200-800 bg-surface-50-950 px-3 py-2 text-sm font-semibold text-surface-950-50 hover:bg-surface-100-900 md:order-last md:flex-col md:justify-center md:gap-1.5 md:border-b-0 md:border-l md:px-2 md:py-3"
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						class="h-4 w-4"
+						aria-hidden="true"
+					>
+						<path d="M18 6L6 18" />
+						<path d="M6 6l12 12" />
+					</svg>
+				</button>
+			</div>
+			<div class="min-h-0 flex-1 overflow-y-auto">
+				{@render paneContent()}
+			</div>
+		</div>
+	{/if}
+{:else}
+	<!-- Desktop: collapsible panel with floating edge pill -->
+	<Collapsible.Root
+		bind:open={readerController.showNav}
+		aria-label="Navigation"
+		class="relative shrink-0 md:flex md:h-full md:flex-row"
 	>
-		<svg
-			xmlns="http://www.w3.org/2000/svg"
-			viewBox="0 0 24 24"
-			fill="none"
-			stroke="currentColor"
-			stroke-width="2"
-			stroke-linecap="round"
-			stroke-linejoin="round"
-			class="order-last h-4 w-4 shrink-0 transition-transform duration-200 md:order-first"
-			style="transform: rotate({chevronRotation}deg);"
-			aria-hidden="true"
+		<Collapsible.Content
+			forceMount
+			class="flex min-h-0 flex-col overflow-hidden md:w-0 md:rounded-md md:border md:border-surface-200-800 md:bg-surface-50-950 md:transition-[width] md:duration-200 md:ease-in-out md:data-[state=open]:w-64"
 		>
-			<path d="M6 9l6 6 6-6" />
-		</svg>
-		<span class="order-first md:order-last md:[writing-mode:vertical-rl]">Navigation Pane</span>
-	</Collapsible.Trigger>
-</Collapsible.Root>
+			{@render paneContent()}
+		</Collapsible.Content>
+
+		<Collapsible.Trigger
+			aria-label="Toggle navigation pane"
+			class="absolute top-1/2 right-0 z-10 flex h-7 w-7 translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-surface-200-800 bg-surface-50-950 text-surface-950-50 shadow-sm transition-colors hover:bg-surface-100-900 focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:outline-none"
+		>
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2.5"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				class="h-3 w-3 transition-transform duration-200"
+				style="transform: rotate({desktopChevronRotation}deg);"
+				aria-hidden="true"
+			>
+				<path d="M6 9l6 6 6-6" />
+			</svg>
+		</Collapsible.Trigger>
+	</Collapsible.Root>
+{/if}
+
+{#snippet paneContent()}
+	<Tabs
+		value={readerController.activeTab}
+		onValueChange={(d) => handleTabChange(d.value)}
+		class="flex h-full min-h-0 w-full flex-col"
+	>
+		<Tabs.List class="flex shrink-0 items-center gap-1 border-b border-surface-200-800 p-1">
+			<Tabs.Trigger
+				value="thumbs"
+				class="flex-1 rounded-sm px-2 py-1.5 text-sm font-medium text-surface-950-50 outline-none hover:bg-surface-100-900 focus-visible:bg-surface-100-900 data-[selected]:bg-primary-500/15 data-[selected]:text-primary-500"
+			>
+				Thumbnails
+			</Tabs.Trigger>
+			<Tabs.Trigger
+				value="outline"
+				class="flex-1 rounded-sm px-2 py-1.5 text-sm font-medium text-surface-950-50 outline-none hover:bg-surface-100-900 focus-visible:bg-surface-100-900 data-[selected]:bg-primary-500/15 data-[selected]:text-primary-500"
+			>
+				Outline
+			</Tabs.Trigger>
+		</Tabs.List>
+		<Tabs.Content value="thumbs" class="min-h-0 flex-1 overflow-hidden">
+			<ThumbnailsPanel {pdfDoc} {pageCount} {hasDoc} />
+		</Tabs.Content>
+		<Tabs.Content value="outline" class="min-h-0 flex-1 overflow-hidden">
+			<OutlinePanel {outline} {outlineLoading} {hasDoc} />
+		</Tabs.Content>
+	</Tabs>
+{/snippet}

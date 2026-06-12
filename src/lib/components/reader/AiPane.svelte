@@ -24,30 +24,31 @@
 <Collapsible.Root
 	bind:open={readerController.showAi}
 	aria-label="AI"
-	class="flex shrink-0 flex-col overflow-hidden rounded-md border border-surface-200-800 bg-surface-50-950 md:h-full md:flex-row"
+	class="relative shrink-0 overflow-hidden rounded-md border border-surface-200-800 bg-surface-50-950 md:flex md:h-full md:flex-row md:overflow-visible md:border-0 md:bg-transparent"
 >
 	<Collapsible.Trigger
-		class="flex shrink-0 items-center justify-between gap-2 border-b border-surface-200-800 bg-surface-50-950 px-3 py-2 text-sm font-semibold text-surface-950-50 hover:bg-surface-100-900 md:flex-col md:justify-center md:gap-1.5 md:border-r md:border-b-0 md:px-2 md:py-3"
+		aria-label="Toggle AI pane"
+		class="order-first flex shrink-0 cursor-pointer items-center justify-center gap-2 border-b border-surface-200-800 bg-surface-50-950 px-2 py-1 text-surface-950-50 hover:bg-surface-100-900 max-md:rounded-none md:absolute md:top-1/2 md:left-0 md:z-10 md:order-last md:h-7 md:w-7 md:-translate-x-1/2 md:-translate-y-1/2 md:items-center md:justify-center md:rounded-full md:border md:border-surface-200-800 md:bg-surface-50-950 md:px-0 md:py-0 md:shadow-sm md:transition-colors md:hover:bg-surface-100-900 md:focus-visible:ring-2 md:focus-visible:ring-primary-500 md:focus-visible:outline-none"
 	>
 		<svg
 			xmlns="http://www.w3.org/2000/svg"
 			viewBox="0 0 24 24"
 			fill="none"
 			stroke="currentColor"
-			stroke-width="2"
+			stroke-width="2.5"
 			stroke-linecap="round"
 			stroke-linejoin="round"
-			class="order-last h-4 w-4 shrink-0 transition-transform duration-200 md:order-first"
+			class="order-last h-4 w-4 shrink-0 transition-transform duration-200 md:order-first md:h-3 md:w-3"
 			style="transform: rotate({chevronRotation}deg);"
 			aria-hidden="true"
 		>
 			<path d="M6 9l6 6 6-6" />
 		</svg>
-		<span class="order-first md:order-last md:[writing-mode:vertical-rl]">AI Pane</span>
+		<span class="order-first text-xs md:hidden">AI</span>
 	</Collapsible.Trigger>
 	<Collapsible.Content
 		forceMount
-		class="flex max-h-0 min-h-0 flex-col overflow-hidden transition-[max-height,width] duration-200 data-[state=open]:max-h-[60vh] md:max-h-none md:w-0 md:data-[state=open]:w-80"
+		class="flex min-h-0 flex-col overflow-hidden transition-[max-height,width] duration-200 max-md:max-h-0 max-md:data-[state=open]:max-h-[60vh] md:h-full md:w-0 md:rounded-md md:border md:border-surface-200-800 md:bg-surface-50-950 md:transition-[width] md:duration-200 md:data-[state=open]:w-80"
 	>
 		<div class="min-h-0 flex-1 overflow-y-auto">
 			{@render placeholder()}
