@@ -20,6 +20,7 @@
 	let outline = $state<OutlineNode[] | null>(null);
 	let outlineLoading = $state(false);
 	let workerSet = false;
+	let navResizing = $state(false);
 
 	const hasDoc = $derived(readerController.doc !== null);
 
@@ -183,17 +184,20 @@
 
 	function startNavResize(e: MouseEvent) {
 		e.preventDefault();
+		navResizing = true;
 		const startX = e.clientX;
 		const startWidth = readerController.navPaneWidth;
 
 		function onMove(ev: MouseEvent) {
 			const delta = ev.clientX - startX;
-			readerController.setNavPaneWidth(startWidth + delta);
+			readerController.navPaneWidth = readerController.clampWidth(startWidth + delta);
 		}
 
 		function onUp() {
+			navResizing = false;
 			document.removeEventListener('mousemove', onMove);
 			document.removeEventListener('mouseup', onUp);
+			readerController.setNavPaneWidth(readerController.navPaneWidth);
 		}
 
 		document.addEventListener('mousemove', onMove);
@@ -254,7 +258,9 @@
 		<Collapsible.Content
 			forceMount
 			class="flex min-h-0 flex-col overflow-hidden md:w-0 md:rounded-md md:border md:border-surface-200-800 md:bg-surface-50-950 md:transition-[width] md:duration-200 md:ease-in-out"
-			style="width: {readerController.showNav ? readerController.navPaneWidth + 'px' : undefined};"
+			style="width: {readerController.showNav
+				? readerController.navPaneWidth + 'px'
+				: undefined};{navResizing ? 'transition: none !important;' : ''}"
 		>
 			{@render paneContent()}
 		</Collapsible.Content>

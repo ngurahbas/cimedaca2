@@ -10,19 +10,24 @@
 		return readerController.showAi ? 90 : -90;
 	});
 
+	let aiResizing = $state(false);
+
 	function startAiResize(e: MouseEvent) {
 		e.preventDefault();
+		aiResizing = true;
 		const startX = e.clientX;
 		const startWidth = readerController.aiPaneWidth;
 
 		function onMove(ev: MouseEvent) {
 			const delta = startX - ev.clientX;
-			readerController.setAiPaneWidth(startWidth + delta);
+			readerController.aiPaneWidth = readerController.clampWidth(startWidth + delta);
 		}
 
 		function onUp() {
+			aiResizing = false;
 			document.removeEventListener('mousemove', onMove);
 			document.removeEventListener('mouseup', onUp);
+			readerController.setAiPaneWidth(readerController.aiPaneWidth);
 		}
 
 		document.addEventListener('mousemove', onMove);
@@ -68,7 +73,9 @@
 	<Collapsible.Content
 		forceMount
 		class="flex min-h-0 flex-col overflow-hidden transition-[max-height,width] duration-200 max-md:max-h-0 max-md:data-[state=open]:max-h-[60vh] md:h-full md:w-0 md:rounded-md md:border md:border-surface-200-800 md:bg-surface-50-950 md:transition-[width] md:duration-200"
-		style="width: {readerController.showAi ? readerController.aiPaneWidth + 'px' : undefined};"
+		style="width: {readerController.showAi
+			? readerController.aiPaneWidth + 'px'
+			: undefined};{aiResizing ? 'transition: none !important;' : ''}"
 	>
 		{#if readerController.showAi}
 			<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
