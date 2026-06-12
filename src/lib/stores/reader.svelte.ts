@@ -6,6 +6,8 @@ export type ViewerRef = {
 	scrollToPage(n: number): void;
 };
 
+export type PdfEngine = 'pdfjs' | 'pdfium';
+
 class ReaderController {
 	showNav = $state(true);
 	showAi = $state(true);
@@ -13,6 +15,7 @@ class ReaderController {
 	isMobile = $state(false);
 	doc = $state.raw<{ name: string; data: ArrayBuffer } | null>(null);
 	viewerRef = $state.raw<ViewerRef | null>(null);
+	pdfEngine = $state<PdfEngine>('pdfjs');
 
 	zoomScale = $state(1.0);
 	zoomStep = 0.1;
@@ -43,6 +46,10 @@ class ReaderController {
 	}
 	toggleAi() {
 		this.showAi = !this.showAi;
+	}
+
+	setPdfEngine(engine: PdfEngine) {
+		this.pdfEngine = engine;
 	}
 
 	async openPdfFile(file: File): Promise<void> {
