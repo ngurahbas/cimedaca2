@@ -16,21 +16,14 @@ class ReaderController {
 	viewerRef = $state.raw<ViewerRef | null>(null);
 
 	zoomScale = $state(1.0);
-	zoomStep = 0.1;
 	zoomMin = 0.25;
 	zoomMax = 4.0;
 
 	zoomIn() {
-		this.zoomScale = Math.min(
-			this.zoomMax,
-			Math.round((this.zoomScale + this.zoomStep) * 100) / 100
-		);
+		this.zoomScale = Math.min(this.zoomMax, Math.floor(this.zoomScale * 4) / 4 + 0.25);
 	}
 	zoomOut() {
-		this.zoomScale = Math.max(
-			this.zoomMin,
-			Math.round((this.zoomScale - this.zoomStep) * 100) / 100
-		);
+		this.zoomScale = Math.max(this.zoomMin, Math.ceil(this.zoomScale * 4) / 4 - 0.25);
 	}
 	setZoom(n: number) {
 		this.zoomScale = Math.max(this.zoomMin, Math.min(this.zoomMax, Math.round(n * 100) / 100));
