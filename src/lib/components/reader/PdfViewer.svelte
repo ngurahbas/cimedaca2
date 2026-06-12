@@ -8,7 +8,7 @@
 	type Props = {
 		data: ArrayBuffer;
 	};
-	export { scrollToPage };
+	export { scrollToPage, fitToWidth };
 
 	let { data }: Props = $props();
 
@@ -36,6 +36,20 @@
 		if (!scrollEl) return;
 		const target = scrollEl.querySelector<HTMLElement>(`[data-page-number="${n}"]`);
 		target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+	}
+
+	function fitToWidth() {
+		if (!pdfDocument || !scrollEl) return;
+		const computedStyle = window.getComputedStyle(scrollEl);
+		const paddingLeft = parseFloat(computedStyle.paddingLeft);
+		const paddingRight = parseFloat(computedStyle.paddingRight);
+		const availableWidth = scrollEl.clientWidth - paddingLeft - paddingRight;
+
+		void pdfDocument.getPage(1).then((page) => {
+			const viewport = page.getViewport({ scale: 1 });
+			const newScale = availableWidth / viewport.width;
+			readerController.setZoom(newScale);
+		});
 	}
 
 	onMount(() => {

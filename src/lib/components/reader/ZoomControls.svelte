@@ -4,6 +4,7 @@
 	import Minus from '@lucide/svelte/icons/minus';
 	import Plus from '@lucide/svelte/icons/plus';
 	import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
+	import StretchHorizontal from '@lucide/svelte/icons/stretch-horizontal';
 </script>
 
 <div
@@ -45,6 +46,23 @@
 				class="z-50 rounded-md border border-surface-200-800 bg-surface-50-950 px-2 py-1 text-xs text-surface-950-50 shadow-md"
 			>
 				Zoom in
+			</Tooltip.Content>
+		</Tooltip.Root>
+
+		<Tooltip.Root>
+			<Tooltip.Trigger
+				onclick={() => readerController.fitToWidth()}
+				class="flex h-7 w-7 items-center justify-center rounded-full text-sm font-medium text-surface-950-50 outline-none select-none hover:bg-surface-200-800 focus-visible:bg-surface-200-800"
+				aria-label="Fit to width"
+			>
+				<StretchHorizontal class="h-4 w-4" strokeWidth={2.5} />
+			</Tooltip.Trigger>
+			<Tooltip.Content
+				side="top"
+				sideOffset={6}
+				class="z-50 rounded-md border border-surface-200-800 bg-surface-50-950 px-2 py-1 text-xs text-surface-950-50 shadow-md"
+			>
+				Fit to width
 			</Tooltip.Content>
 		</Tooltip.Root>
 

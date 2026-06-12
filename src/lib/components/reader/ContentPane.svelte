@@ -8,7 +8,10 @@
 
 	$effect(() => {
 		readerController.viewerRef = viewer
-			? { scrollToPage: (n: number) => viewer?.scrollToPage(n) }
+			? {
+					scrollToPage: (n: number) => viewer?.scrollToPage(n),
+					fitToWidth: () => viewer?.fitToWidth()
+				}
 			: null;
 		return () => {
 			readerController.viewerRef = null;

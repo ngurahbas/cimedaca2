@@ -4,6 +4,7 @@ export type ReaderTab = 'thumbs' | 'outline';
 
 export type ViewerRef = {
 	scrollToPage(n: number): void;
+	fitToWidth(): void;
 };
 
 class ReaderController {
@@ -36,6 +37,9 @@ class ReaderController {
 	}
 	resetZoom() {
 		this.zoomScale = 1.0;
+	}
+	fitToWidth() {
+		this.viewerRef?.fitToWidth();
 	}
 
 	toggleNav() {
