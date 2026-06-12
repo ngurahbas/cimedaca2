@@ -15,6 +15,11 @@ class ReaderController {
 	doc = $state.raw<{ name: string; data: ArrayBuffer } | null>(null);
 	viewerRef = $state.raw<ViewerRef | null>(null);
 
+	navPaneWidth = $state(256);
+	aiPaneWidth = $state(320);
+	minPaneWidth = 240;
+	maxPaneWidth = 720;
+
 	zoomScale = $state(1.0);
 	zoomMin = 0.25;
 	zoomMax = 4.0;
@@ -33,6 +38,19 @@ class ReaderController {
 	}
 	fitToWidth() {
 		this.viewerRef?.fitToWidth();
+	}
+
+	clampWidth(w: number) {
+		return Math.max(this.minPaneWidth, Math.min(this.maxPaneWidth, w));
+	}
+
+	setNavPaneWidth(w: number) {
+		this.navPaneWidth = this.clampWidth(w);
+		if (browser) localStorage.setItem('reader-nav-pane-width', String(this.navPaneWidth));
+	}
+	setAiPaneWidth(w: number) {
+		this.aiPaneWidth = this.clampWidth(w);
+		if (browser) localStorage.setItem('reader-ai-pane-width', String(this.aiPaneWidth));
 	}
 
 	toggleNav() {
@@ -62,6 +80,11 @@ class ReaderController {
 export const readerController = new ReaderController();
 
 if (browser) {
+	const savedNav = localStorage.getItem('reader-nav-pane-width');
+	if (savedNav) readerController.setNavPaneWidth(parseInt(savedNav, 10));
+	const savedAi = localStorage.getItem('reader-ai-pane-width');
+	if (savedAi) readerController.setAiPaneWidth(parseInt(savedAi, 10));
+
 	const mql = window.matchMedia('(max-width: 767px)');
 	readerController.isMobile = mql.matches;
 	mql.addEventListener('change', (e) => {

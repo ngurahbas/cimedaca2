@@ -9,6 +9,25 @@
 		}
 		return readerController.showAi ? 90 : -90;
 	});
+
+	function startAiResize(e: MouseEvent) {
+		e.preventDefault();
+		const startX = e.clientX;
+		const startWidth = readerController.aiPaneWidth;
+
+		function onMove(ev: MouseEvent) {
+			const delta = startX - ev.clientX;
+			readerController.setAiPaneWidth(startWidth + delta);
+		}
+
+		function onUp() {
+			document.removeEventListener('mousemove', onMove);
+			document.removeEventListener('mouseup', onUp);
+		}
+
+		document.addEventListener('mousemove', onMove);
+		document.addEventListener('mouseup', onUp);
+	}
 </script>
 
 {#snippet placeholder()}
@@ -48,8 +67,20 @@
 	</Collapsible.Trigger>
 	<Collapsible.Content
 		forceMount
-		class="flex min-h-0 flex-col overflow-hidden transition-[max-height,width] duration-200 max-md:max-h-0 max-md:data-[state=open]:max-h-[60vh] md:h-full md:w-0 md:rounded-md md:border md:border-surface-200-800 md:bg-surface-50-950 md:transition-[width] md:duration-200 md:data-[state=open]:w-80"
+		class="flex min-h-0 flex-col overflow-hidden transition-[max-height,width] duration-200 max-md:max-h-0 max-md:data-[state=open]:max-h-[60vh] md:h-full md:w-0 md:rounded-md md:border md:border-surface-200-800 md:bg-surface-50-950 md:transition-[width] md:duration-200"
+		style="width: {readerController.showAi ? readerController.aiPaneWidth + 'px' : undefined};"
 	>
+		{#if readerController.showAi}
+			<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+			<div
+				role="separator"
+				aria-orientation="vertical"
+				aria-label="Resize AI pane"
+				tabindex="-1"
+				class="absolute top-0 left-0 z-20 h-full w-1 cursor-col-resize bg-surface-200-800/30 hover:bg-primary-500/50"
+				onmousedown={startAiResize}
+			></div>
+		{/if}
 		<div class="min-h-0 flex-1 overflow-y-auto">
 			{@render placeholder()}
 		</div>

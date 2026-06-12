@@ -180,6 +180,25 @@
 	});
 
 	const desktopChevronRotation = $derived(readerController.showNav ? -90 : 90);
+
+	function startNavResize(e: MouseEvent) {
+		e.preventDefault();
+		const startX = e.clientX;
+		const startWidth = readerController.navPaneWidth;
+
+		function onMove(ev: MouseEvent) {
+			const delta = ev.clientX - startX;
+			readerController.setNavPaneWidth(startWidth + delta);
+		}
+
+		function onUp() {
+			document.removeEventListener('mousemove', onMove);
+			document.removeEventListener('mouseup', onUp);
+		}
+
+		document.addEventListener('mousemove', onMove);
+		document.addEventListener('mouseup', onUp);
+	}
 </script>
 
 {#if readerController.isMobile}
@@ -234,10 +253,23 @@
 	>
 		<Collapsible.Content
 			forceMount
-			class="flex min-h-0 flex-col overflow-hidden md:w-0 md:rounded-md md:border md:border-surface-200-800 md:bg-surface-50-950 md:transition-[width] md:duration-200 md:ease-in-out md:data-[state=open]:w-64"
+			class="flex min-h-0 flex-col overflow-hidden md:w-0 md:rounded-md md:border md:border-surface-200-800 md:bg-surface-50-950 md:transition-[width] md:duration-200 md:ease-in-out"
+			style="width: {readerController.showNav ? readerController.navPaneWidth + 'px' : undefined};"
 		>
 			{@render paneContent()}
 		</Collapsible.Content>
+
+		{#if readerController.showNav}
+			<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+			<div
+				role="separator"
+				aria-orientation="vertical"
+				aria-label="Resize navigation pane"
+				tabindex="-1"
+				class="absolute top-0 right-0 z-20 h-full w-1 cursor-col-resize bg-surface-200-800/30 hover:bg-primary-500/50"
+				onmousedown={startNavResize}
+			></div>
+		{/if}
 
 		<Collapsible.Trigger
 			aria-label="Toggle navigation pane"
