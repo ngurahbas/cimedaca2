@@ -1,0 +1,44 @@
+{
+	"models": [
+		{
+			"name": "unsloth/gemma-4-12b-it-GGUF:UD-Q4_K_XL",
+			"model": "unsloth/gemma-4-12b-it-GGUF:UD-Q4_K_XL",
+			"modified_at": "",
+			"size": "",
+			"digest": "",
+			"type": "model",
+			"description": "",
+			"tags": [""],
+			"capabilities": ["completion", "multimodal"],
+			"parameters": "",
+			"details": {
+				"parent_model": "",
+				"format": "gguf",
+				"family": "",
+				"families": [""],
+				"parameter_size": "",
+				"quantization_level": ""
+			}
+		}
+	],
+	"object": "list",
+	"data": [
+		{
+			"id": "unsloth/gemma-4-12b-it-GGUF:UD-Q4_K_XL",
+			"aliases": ["unsloth/gemma-4-12b-it-GGUF:UD-Q4_K_XL"],
+			"tags": [],
+			"object": "model",
+			"created": 1781326703,
+			"owned_by": "llamacpp",
+			"meta": {
+				"vocab_type": 2,
+				"n_vocab": 262144,
+				"n_ctx": 64000,
+				"n_ctx_train": 262144,
+				"n_embd": 3840,
+				"n_params": 11907350576,
+				"size": 7350597824
+			}
+		}
+	]
+}

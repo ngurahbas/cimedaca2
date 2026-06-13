@@ -28,9 +28,8 @@ SvelteKit app using **Svelte 5 runes mode**, forced project-wide for non-`node_m
 **Shared code** (under `src/lib/`):
 
 - `components/` - root components (`ThemeMenu.svelte`, `ThemeMenuMenu.svelte`) and `reader/` subfolder with the reader's pieces
-- `stores/` - rune-based controllers in `*.svelte.ts` files (e.g. `theme.svelte.ts`, `reader.svelte.ts`). They export a singleton instance; rely on `$app/environment` `browser` guard.
+- `stores/` - rune-based controllers in `*.svelte.ts` files (e.g. `theme.svelte.ts`, `reader.svelte.ts`, `llm.svelte.ts`). They export a singleton instance; rely on `$app/environment` `browser` guard.
 - `assets/` - static assets imported through `$lib` (favicon)
-- `vitest-examples/` - sample test/demo content; **not part of the app**
 
 `src/routes/+layout.svelte` is a thin wrapper: imports `layout.css` and the favicon, then renders `children`. There is no reader-specific `+layout.svelte`.
 
@@ -55,11 +54,15 @@ Prefer existing libraries over hand-rolled implementations:
 
 ## Testing
 
-**Vitest** (`vite.config.ts`) is configured with two projects:
+All tests live under `tests/`:
 
-- **client** - browser-based via `@vitest/browser-playwright` provider (chromium only, headless). Matches `src/**/*.svelte.{test,spec}.{js,ts}`. Excludes `src/lib/server/**`.
-- **server** - node environment. Matches `src/**/*.{test,spec}.{js,ts}`. Excludes `*.svelte.{test,spec}` files.
-- Global `expect.requireAssertions: true` - tests must assert; bare no-assertion tests fail.
+- `tests/unit/` — Vitest specs. Two projects in `vite.config.ts`:
+  - **client** (`tests/**/*.svelte.{test,spec}.{js,ts}`) — browser-based via `@vitest/browser-playwright` provider (chromium only, headless). Excludes `src/lib/server/**`.
+  - **server** (everything else under `tests/unit/`) — node environment. Excludes `*.svelte.{test,spec}` files.
+  - Global `expect.requireAssertions: true` — tests must assert; bare no-assertion tests fail.
+- `tests/e2e/` — Playwright `*.e2e.{ts,js}`.
+- `tests/fixtures/` — static test data (e.g. captured HTTP responses in `tests/fixtures/llm/`).
+- `tests/unit/samples/` — non-app demo code that exists only as test fodder (e.g. `greet.ts` + `Welcome.svelte`); not imported by the app.
 
 Run a single project: `bun run test:unit --project=server` (or `=client`). Run one file: `bun run test:unit -- path/to/file.spec.ts`.
 
