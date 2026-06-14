@@ -1,16 +1,16 @@
 ---
-title: "Approximate Nearest Neighbor Search in High-Dimensional Spaces using Learned Index Structures"
+title: 'Approximate Nearest Neighbor Search in High-Dimensional Spaces using Learned Index Structures'
 author:
-  - name: "Alice Chen"
-    affiliation: "Department of Computer Science, Stanford University"
-    email: "achen@stanford.edu"
-  - name: "Bob Martinez"
-    affiliation: "Google Research, Mountain View"
-    email: "bobm@google.com"
-  - name: "Carol Nakamura"
-    affiliation: "MIT CSAIL, Cambridge"
-    email: "caroln@mit.edu"
-date: "2024-06-15"
+  - name: 'Alice Chen'
+    affiliation: 'Department of Computer Science, Stanford University'
+    email: 'achen@stanford.edu'
+  - name: 'Bob Martinez'
+    affiliation: 'Google Research, Mountain View'
+    email: 'bobm@google.com'
+  - name: 'Carol Nakamura'
+    affiliation: 'MIT CSAIL, Cambridge'
+    email: 'caroln@mit.edu'
+date: '2024-06-15'
 abstract: |
   Approximate nearest neighbor (ANN) search is a fundamental problem in machine
   learning, information retrieval, and computer vision. Traditional indexing
@@ -53,7 +53,7 @@ Existing ANN methods fall into three categories:
 3. **Graph-based methods** (HNSW, NSG) which construct navigable small-world
    graphs for greedy search [@malkov2018hnsw].
 
-Recent work on *learned index structures* [@kraska2018case] suggests that
+Recent work on _learned index structures_ [@kraska2018case] suggests that
 replacing hand-crafted indexes with learned models can yield significant
 performance gains. We extend this idea to the ANN domain.
 
@@ -90,9 +90,9 @@ settings [@kristo2020learned] and spatial indexes [@nathan2020learning].
 
 ## Problem Formulation
 
-**Definition 1** ($c$-Approximate Nearest Neighbor). *Given a dataset
+**Definition 1** ($c$-Approximate Nearest Neighbor). _Given a dataset
 $\mathcal{D} \subset \mathbb{R}^d$, a query $q$, and $c \geq 1$, return a point
-$x' \in \mathcal{D}$ such that*
+$x' \in \mathcal{D}$ such that_
 
 $$\|q - x'\|_2 \leq c \cdot \min_{x \in \mathcal{D}} \|q - x\|_2.$$
 
@@ -120,8 +120,10 @@ The filter is trained on a held-out query set $\mathcal{Q}$ with ground-truth
 neighbor labels. For each $(q, \mathcal{N}_k(q))$, we minimize the binary
 cross-entropy:
 
-$$\mathcal{L}(\theta) = -\frac{1}{|\mathcal{Q}|} \sum_{q \in \mathcal{Q}}
-\sum_{i=1}^{n} \left[ y_i \log p_i + (1 - y_i) \log(1 - p_i) \right]$$
+$$
+\mathcal{L}(\theta) = -\frac{1}{|\mathcal{Q}|} \sum_{q \in \mathcal{Q}}
+\sum_{i=1}^{n} \left[ y_i \log p_i + (1 - y_i) \log(1 - p_i) \right]
+$$
 
 where $y_i = \mathbf{1}[x_i \in \mathcal{N}_k(q)]$.
 
@@ -139,10 +141,10 @@ For billion-scale datasets, a single filter is insufficient. We employ a cascade
 of $L$ filters with increasing precision:
 
 | Stage | Input Size | Output Size | Recall Target | Parameters |
-|:-----:|:----------:|:-----------:|:-------------:|:----------:|
-| 1     | $n$        | $n/10$      | 0.99          | 2M         |
-| 2     | $n/10$     | $n/100$     | 0.98          | 4M         |
-| 3     | $n/100$    | $n/1000$    | 0.97          | 8M         |
+| :---: | :--------: | :---------: | :-----------: | :--------: |
+|   1   |    $n$     |   $n/10$    |     0.99      |     2M     |
+|   2   |   $n/10$   |   $n/100$   |     0.98      |     4M     |
+|   3   |  $n/100$   |  $n/1000$   |     0.97      |     8M     |
 
 : Cascade architecture for Deep-1B ($n = 10^9$, $d = 96$). {#tbl:cascade}
 
@@ -151,18 +153,19 @@ memory overhead is approximately 14M parameters (56 MB in FP32).
 
 ## Theoretical Analysis
 
-**Theorem 1**. *Let $\mathcal{D}$ be drawn i.i.d. from a distribution with
+**Theorem 1**. _Let $\mathcal{D}$ be drawn i.i.d. from a distribution with
 bounded doubling dimension $d_{\text{db}}$. If the learned filter achieves
-recall $1 - \delta$ at each stage, then the expected query time is:*
+recall $1 - \delta$ at each stage, then the expected query time is:\_
 
 $$\mathbb{E}[T(q)] = O\left( \frac{\log n}{\log(1/\alpha)} + d \right)$$
 
 where $\alpha = 1 / (1 - \delta)^{1/L}$ and $L$ is the number of cascade stages.
 
-*Proof sketch.* At each stage, the candidate set shrinks by factor $\alpha$.
+_Proof sketch._ At each stage, the candidate set shrinks by factor $\alpha$.
 After $L$ stages, the remaining candidates number
 $n / \alpha^L = O(\log n)$ in expectation. The graph refinement over $O(\log n)
-+ d$ candidates takes $O(\log n + d)$ time. $\square$
+
+- d$ candidates takes $O(\log n + d)$ time. $\square$
 
 # Experiments
 
@@ -170,11 +173,11 @@ $n / \alpha^L = O(\log n)$ in expectation. The graph refinement over $O(\log n)
 
 **Datasets.** We evaluate on three standard benchmarks:
 
-| Dataset     | $n$         | $d$  | Queries | Distance  |
-|:------------|:-----------:|:----:|:-------:|:---------:|
-| SIFT-1M     | 1,000,000   | 128  | 10,000  | Euclidean |
-| GloVe-200   | 1,183,514   | 200  | 10,000  | Cosine    |
-| Deep-1B     | 1,000,000,000 | 96 | 10,000  | Euclidean |
+| Dataset   |      $n$      | $d$ | Queries | Distance  |
+| :-------- | :-----------: | :-: | :-----: | :-------: |
+| SIFT-1M   |   1,000,000   | 128 | 10,000  | Euclidean |
+| GloVe-200 |   1,183,514   | 200 | 10,000  |  Cosine   |
+| Deep-1B   | 1,000,000,000 | 96  | 10,000  | Euclidean |
 
 : Evaluation datasets. {#tbl:datasets}
 
@@ -193,13 +196,13 @@ time. All experiments use a single Intel Xeon 8380 CPU with 256 GB RAM.
 Table @tbl:sift1m shows results on SIFT-1M. LearnedANN achieves 98.2% recall
 at 45,200 QPS, which is 2.4x faster than HNSW at comparable recall.
 
-| Method      | Recall@10 | QPS     | Build Time (s) |
-|:------------|:---------:|:-------:|:---------------:|
-| Brute-force | 100.0     | 1,200   | 0               |
-| IVF-PQ      | 92.1      | 32,500  | 45              |
-| HNSW        | 97.8      | 18,900  | 120             |
-| ScaNN       | 96.5      | 28,300  | 85              |
-| **LearnedANN** | **98.2** | **45,200** | 210        |
+| Method         | Recall@10 |    QPS     | Build Time (s) |
+| :------------- | :-------: | :--------: | :------------: |
+| Brute-force    |   100.0   |   1,200    |       0        |
+| IVF-PQ         |   92.1    |   32,500   |       45       |
+| HNSW           |   97.8    |   18,900   |      120       |
+| ScaNN          |   96.5    |   28,300   |       85       |
+| **LearnedANN** | **98.2**  | **45,200** |      210       |
 
 : Results on SIFT-1M. {#tbl:sift1m}
 
@@ -212,12 +215,12 @@ On the billion-scale Deep-1B dataset, LearnedANN processes 12,400 QPS with
 
 We ablate each component of LearnedANN on SIFT-1M:
 
-| Configuration               | Recall@10 | QPS     |
-|:----------------------------|:---------:|:-------:|
-| Full model                  | 98.2      | 45,200  |
-| w/o cascade (single filter) | 94.5      | 38,100  |
-| w/o graph refinement        | 91.3      | 52,800  |
-| w/o factorized output       | 97.9      | 31,400  |
+| Configuration               | Recall@10 |  QPS   |
+| :-------------------------- | :-------: | :----: |
+| Full model                  |   98.2    | 45,200 |
+| w/o cascade (single filter) |   94.5    | 38,100 |
+| w/o graph refinement        |   91.3    | 52,800 |
+| w/o factorized output       |   97.9    | 31,400 |
 
 : Ablation study on SIFT-1M. {#tbl:ablation}
 
@@ -228,12 +231,12 @@ refinement adds +2.9% recall at a modest speed cost.
 
 Table @tbl:memory compares memory usage across methods for Deep-1B.
 
-| Method      | Index Size (GB) | Recall@10 |
-|:------------|:---------------:|:---------:|
-| HNSW        | 48.2            | 97.1      |
-| IVF-PQ      | 12.4            | 91.8      |
-| DiskANN     | 6.8*            | 95.8      |
-| **LearnedANN** | **8.1**      | **96.1**  |
+| Method         | Index Size (GB) | Recall@10 |
+| :------------- | :-------------: | :-------: |
+| HNSW           |      48.2       |   97.1    |
+| IVF-PQ         |      12.4       |   91.8    |
+| DiskANN        |      6.8\*      |   95.8    |
+| **LearnedANN** |     **8.1**     | **96.1**  |
 
 : Memory comparison on Deep-1B. DiskANN stores graph on disk. {#tbl:memory}
 
@@ -279,45 +282,45 @@ dynamic settings and exploring hardware-aware architectures.
 \small
 
 [@bentley1975multidimensional] Bentley, J. L. (1975). Multidimensional binary
-search trees used for associative searching. *Communications of the ACM*,
+search trees used for associative searching. _Communications of the ACM_,
 18(9), 509--517.
 
 [@datar2004locality] Datar, M., Immorlica, N., Indyk, P., & Mirrokni, V. S.
 (2004). Locality-sensitive hashing scheme based on p-stable distributions. In
-*Proceedings of the 20th Annual Symposium on Computational Geometry* (pp.
+_Proceedings of the 20th Annual Symposium on Computational Geometry_ (pp.
 253--262).
 
 [@guo2020accelerating] Guo, R., Sun, P., Lindgren, E., Geng, Q., Simcha, D.,
 Chern, F., & Kumar, S. (2020). Accelerating large-scale inference with
-anisotropic vector quantization. In *ICML*.
+anisotropic vector quantization. In _ICML_.
 
 [@indyk1998approximate] Indyk, P., & Motwani, R. (1998). Approximate nearest
-neighbors: Towards removing the curse of dimensionality. In *Proceedings of the
-30th Annual ACM Symposium on Theory of Computing* (pp. 604--613).
+neighbors: Towards removing the curse of dimensionality. In _Proceedings of the
+30th Annual ACM Symposium on Theory of Computing_ (pp. 604--613).
 
 [@jegou2011product] Jegou, H., Douze, M., & Schmid, C. (2011). Product
-quantization for nearest neighbor search. *IEEE Transactions on Pattern
-Analysis and Machine Intelligence*, 33(1), 117--128.
+quantization for nearest neighbor search. _IEEE Transactions on Pattern
+Analysis and Machine Intelligence_, 33(1), 117--128.
 
 [@kraska2018case] Kraska, T., Beutel, A., Chi, E. H., Dean, J., & Polyzotis,
-N. (2018). The case for learned index structures. In *Proceedings of the 2018
-International Conference on Management of Data* (pp. 489--504).
+N. (2018). The case for learned index structures. In _Proceedings of the 2018
+International Conference on Management of Data_ (pp. 489--504).
 
 [@kristo2020learned] Kristo, A., Vaidya, K., Kossmann, D., & Kraska, T.
-(2020). Learned index for spatial queries. In *Proceedings of the 21st IEEE
-International Conference on Mobile Data Management* (pp. 154--164).
+(2020). Learned index for spatial queries. In _Proceedings of the 21st IEEE
+International Conference on Mobile Data Management_ (pp. 154--164).
 
 [@malkov2018hnsw] Malkov, Y. A., & Yashunin, D. A. (2018). Efficient and
 robust approximate nearest neighbor search using Hierarchical Navigable Small
-World graphs. *IEEE Transactions on Pattern Analysis and Machine Intelligence*,
+World graphs. _IEEE Transactions on Pattern Analysis and Machine Intelligence_,
 42(4), 824--836.
 
 [@nathan2020learning] Nathan, V., Ding, J., Alizadeh, M., & Kraska, T.
-(2020). Learning multi-dimensional indexes. In *Proceedings of the 2020
-ACM SIGMOD International Conference on Management of Data* (pp. 985--999).
+(2020). Learning multi-dimensional indexes. In _Proceedings of the 2020
+ACM SIGMOD International Conference on Management of Data_ (pp. 985--999).
 
 [@subramanya2019disk] Subramanya, S. J., Devvrit, F., Simhadri, H. V.,
 Krishnawamy, R., & Kadekodi, R. (2019). DiskANN: Fast accurate billion-point
-nearest neighbor search on a single node. In *NeurIPS*.
+nearest neighbor search on a single node. In _NeurIPS_.
 
 \endgroup
