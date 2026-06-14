@@ -1,5 +1,5 @@
 import { browser } from '$app/environment';
-import { LlmError, type LlmSettings } from '$lib/llm/types';
+import { type LlmSettings } from '$lib/llm/types';
 import { listModels } from '$lib/llm/client';
 
 const STORAGE_KEY = 'llm-settings';
@@ -26,10 +26,54 @@ class LlmController {
 	baseUrl = $state<string>(DEFAULT_BASE_URL);
 	apiKey = $state<string | undefined>(undefined);
 	model = $state<string>('');
+	availableModels = $state<string[]>([]);
+	loadedFromStorage = $state(false);
 
 	isConfigured = $derived(this.model.length > 0);
 
 	constructor() {
+		this.load();
+	}
+
+	async verify(baseUrl: string, apiKey?: string, signal?: AbortSignal): Promise<string[]> {
+		const normalized = normalizeBaseUrl(baseUrl);
+		const ids = await listModels({ baseUrl: normalized, apiKey, signal });
+		this.baseUrl = normalized;
+		this.apiKey = apiKey && apiKey.length > 0 ? apiKey : undefined;
+		this.availableModels = ids;
+		if (ids.length > 0 && (this.model.length === 0 || !ids.includes(this.model))) {
+			this.model = ids[0];
+		}
+		this.persist();
+		return ids;
+	}
+
+	async refresh(signal?: AbortSignal): Promise<string[]> {
+		return this.verify(this.baseUrl, this.apiKey, signal);
+	}
+
+	setModel(model: string): void {
+		this.model = model;
+		if (this.availableModels.length > 0) this.persist();
+	}
+
+	clear(): void {
+		this.baseUrl = DEFAULT_BASE_URL;
+		this.apiKey = undefined;
+		this.model = '';
+		this.availableModels = [];
+		this.loadedFromStorage = false;
+		this.persist();
+	}
+
+	asSettings(): LlmSettings | null {
+		if (!this.isConfigured) return null;
+		const settings: LlmSettings = { baseUrl: this.baseUrl, model: this.model };
+		if (this.apiKey !== undefined) settings.apiKey = this.apiKey;
+		return settings;
+	}
+
+	private load(): void {
 		const stored = readStoredSettings();
 		if (!stored) return;
 		if (typeof stored.baseUrl === 'string' && stored.baseUrl.length > 0) {
@@ -41,53 +85,7 @@ class LlmController {
 		if (typeof stored.model === 'string' && stored.model.length > 0) {
 			this.model = stored.model;
 		}
-	}
-
-	setBaseUrl(url: string): void {
-		this.baseUrl = normalizeBaseUrl(url);
-		this.persist();
-	}
-
-	setApiKey(key: string | undefined): void {
-		this.apiKey = key && key.length > 0 ? key : undefined;
-		this.persist();
-	}
-
-	setModel(model: string): void {
-		this.model = model;
-		this.persist();
-	}
-
-	clear(): void {
-		this.baseUrl = DEFAULT_BASE_URL;
-		this.apiKey = undefined;
-		this.model = '';
-		this.persist();
-	}
-
-	asSettings(): LlmSettings | null {
-		if (!this.isConfigured) return null;
-		const settings: LlmSettings = { baseUrl: this.baseUrl, model: this.model };
-		if (this.apiKey !== undefined) settings.apiKey = this.apiKey;
-		return settings;
-	}
-
-	async refreshModels(signal?: AbortSignal): Promise<string[]> {
-		try {
-			const params: { baseUrl: string; apiKey?: string; signal?: AbortSignal } = {
-				baseUrl: this.baseUrl
-			};
-			if (this.apiKey !== undefined) params.apiKey = this.apiKey;
-			if (signal !== undefined) params.signal = signal;
-			const ids = await listModels(params);
-			if (ids.length > 0 && this.model.length === 0) {
-				this.setModel(ids[0]);
-			}
-			return ids;
-		} catch (err) {
-			if (err instanceof LlmError) return [];
-			throw err;
-		}
+		this.loadedFromStorage = true;
 	}
 
 	private persist(): void {

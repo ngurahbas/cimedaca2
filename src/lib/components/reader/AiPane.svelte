@@ -2,6 +2,7 @@
 	import Bot from '@lucide/svelte/icons/bot';
 	import { Collapsible } from 'bits-ui';
 	import { readerController } from '$lib/stores/reader.svelte';
+	import AiSettings from './AiSettings.svelte';
 
 	const chevronRotation = $derived(readerController.showAi ? 90 : -90);
 
@@ -57,12 +58,17 @@
 	}
 </script>
 
-{#snippet placeholder()}
-	<div class="flex h-full flex-col items-center justify-center gap-3 p-4 text-center">
-		<Bot class="h-10 w-10 text-primary-500" strokeWidth={1.75} aria-hidden="true" />
-		<div class="space-y-1">
-			<h3 class="text-sm font-semibold text-surface-950-50">AI Pane</h3>
-			<p class="text-xs opacity-70">Conversation features are coming soon.</p>
+{#snippet paneContent()}
+	<div class="flex min-h-0 flex-1 flex-col">
+		<div class="shrink-0 p-3">
+			<AiSettings />
+		</div>
+		<div class="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-4 text-center">
+			<Bot class="h-10 w-10 text-primary-500" strokeWidth={1.75} aria-hidden="true" />
+			<div class="space-y-1">
+				<h3 class="text-sm font-semibold text-surface-950-50">AI Pane</h3>
+				<p class="text-xs opacity-70">Conversation features are coming soon.</p>
+			</div>
 		</div>
 	</div>
 {/snippet}
@@ -106,7 +112,7 @@
 				</button>
 			</div>
 			<div class="min-h-0 flex-1 overflow-y-auto">
-				{@render placeholder()}
+				{@render paneContent()}
 			</div>
 		</div>
 	{/if}
@@ -155,7 +161,7 @@
 				></div>
 			{/if}
 			<div class="min-h-0 flex-1 overflow-y-auto">
-				{@render placeholder()}
+				{@render paneContent()}
 			</div>
 		</Collapsible.Content>
 	</Collapsible.Root>
