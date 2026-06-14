@@ -1,0 +1,201 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amsfonts,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tikz}
+\usepackage{hyperref}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+
+\title{\textbf{Scalable Document Reading with LLM-Augmented Navigation}}
+\author{A. R. Ciment \and D. A. Cask\\
+        Department of Computer Science\\
+        University of Imaginary Sciences\\
+        Dreamland}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We present a lightweight architecture for browser-based scientific PDF readers that
+combines high-fidelity canvas rendering with large language model assistance. Our
+system renders pages using PDF.js, synchronizes a text-layer for selectable content,
+and exposes an AI side panel for contextual summarization and question answering. We
+evaluate rendering latency across document lengths up to one hundred pages and show
+that the proposed approach maintains interactive frame rates. A user study with
+thirty-two participants indicates that integrated navigation and conversational
+explanations reduce the time required to locate key sections by approximately forty
+percent.
+\end{abstract}
+
+\section{Introduction}
+
+Reading long technical documents in the browser remains a frustrating experience.
+Users frequently switch between a PDF viewer, a note-taking application, and a
+separate chat interface to ask questions about the content. Existing web-based
+readers either render documents faithfully but offer no assistance, or they extract
+plain text and lose the original typography and figures.
+
+We introduce \emph{Cimedaca Reader}, a single-page application built on SvelteKit that
+marries faithful page rendering with a conversational AI companion. The reader loads
+the Portable Document Format binary in the browser, renders each page to a canvas,
+overlays a transparent text layer for selection and search, and displays an AI panel
+on the right side of the screen.
+
+The main contributions of this paper are:
+\begin{itemize}
+    \item a reactive rendering pipeline that couples PDF.js with Svelte~5 runes,
+    \item a local-only text extraction strategy that preserves user privacy,
+    \item and an empirical evaluation showing interactive performance on documents
+    up to one hundred pages.
+\end{itemize}
+
+\section{System Architecture}
+
+The application is organized into three panes. The navigation pane on the left lists
+document sections and page thumbnails. The content pane in the center displays the
+rendered pages. The AI pane on the right hosts a streaming chat interface backed by
+an OpenAI-compatible endpoint.
+
+\subsection{Rendering Pipeline}
+
+The rendering pipeline begins when the user selects a file. The binary is stored in
+memory as an \texttt{ArrayBuffer} and passed to \texttt{pdfjs-dist}. The library parses
+the file, creates a document proxy, and exposes the number of pages. For each page
+that enters the viewport, we create a canvas element, request the page proxy, and call
+\texttt{render} with a scale derived from the current zoom level.
+
+To support text selection, we render a transparent text layer over each canvas. The
+text layer is populated with absolutely positioned \texttt{span} elements whose locations
+and font sizes are computed from the page viewport. This preserves the visual fidelity
+of the canvas while allowing the browser to handle selection, copying, and screen readers.
+
+The zoom level $s$ is constrained to a minimum $s_{\min}=0.25$ and a maximum
+$s_{\max}=3.0$. When the user triggers a zoom-in event, the new scale is computed as
+\begin{equation}
+    s' = \min(s \cdot \alpha, s_{\max}),
+\end{equation}
+where $\alpha = 1.1$ is the zoom step factor. Conversely, zoom-out uses
+$\alpha^{-1}$ and clamps to $s_{\min}$.
+
+\subsection{Zoom and Scroll}
+
+Zoom is controlled through a reactive scale value in a Svelte rune store. When the user
+presses \texttt{Control} and scrolls the mouse wheel, the scale is multiplied by a constant
+factor. A fit-to-width button computes the largest scale that fits the available client
+width for the first page. Scrolling is handled by a single overflow container that stacks
+pages vertically.
+
+The user can also jump directly to a page by clicking an outline entry or a thumbnail. The
+target page element is scrolled into view with smooth behavior. Formally, the visible page
+$v$ at scroll offset $y$ is
+\begin{equation}
+    v = \arg\max_{p} \, \bigl( \min(y_p + h_p, y + H) - \max(y_p, y) \bigr),
+\end{equation}
+where $y_p$ and $h_p$ are the offset and height of page $p$, and $H$ is the viewport height.
+
+\section{Language Model Integration}
+
+The AI pane submits the current document context together with the user's prompt. We first
+extract the visible page text from the active text layers. This text is concatenated,
+truncated to fit the model context window, and sent as a system message. The user's question
+is appended and streamed back token by token.
+
+We deliberately avoid uploading the raw binary to any external service. All text extraction
+happens locally in the browser, so the document contents never leave the user's device unless
+the user explicitly pastes them into the chat.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    box/.style={draw, rounded corners, minimum width=3cm, minimum height=0.9cm, align=center}
+]
+\node[box, fill=gray!15] (pdf) at (0,0) {PDF file};
+\node[box] (parse) at (4.2,0) {PDF.js parser};
+\node[box] (render) at (8.4,0) {Canvas renderer};
+\node[box] (text) at (8.4,-2) {Text layer};
+\node[box] (llm) at (4.2,-2) {Local LLM client};
+
+\draw[->, thick] (pdf) -- (parse);
+\draw[->, thick] (parse) -- (render);
+\draw[->, thick] (parse) -- ++(0,-1.2) -| (text);
+\draw[->, thick, dashed] (text) -- (llm);
+\end{tikzpicture}
+\caption{Data flow inside the reader. Solid lines represent rendering paths; the dashed line
+shows how extracted text is routed to the local language model client.}
+\label{fig:architecture}
+\end{figure}
+
+\section{Evaluation}
+
+We measured rendering latency on a synthetic corpus of ten documents ranging from five to one
+hundred pages. Each document was generated with a mixture of paragraphs, equations, tables,
+and vector figures. Tests were run on a laptop with a four-core processor and eight gigabytes
+of memory.
+
+\begin{table}[htbp]
+\centering
+\caption{Rendering latency and scroll performance across document lengths.}
+\label{tab:latency}
+\begin{tabular}{@{}rrrr@{}}
+\toprule
+Pages & First paint (ms) & Layout complete (ms) & Scroll fps \\
+\midrule
+5  & 120 & 180 & 60 \\
+20 & 145 & 260 & 60 \\
+50 & 210 & 580 & 55 \\
+100 & 380 & 1120 & 48 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The results in Table~\ref{tab:latency} show that first paint remains below four hundred
+milliseconds even for the longest document. Layout completion time grows linearly with page
+count because every canvas is created upfront. Future work will investigate virtualized
+rendering to reduce initial layout time.
+
+We also conducted a small user study with thirty-two graduate students in computer science.
+Each participant was asked to locate three specific claims in a twenty-page paper. Half of
+the participants used a standard PDF viewer, while the other half used Cimedaca Reader with
+the AI pane enabled. The AI-assisted group completed the task in an average of four minutes
+and twelve seconds, compared to seven minutes and five seconds for the control group.
+
+\section{Related Work}
+
+Browser-based PDF rendering has been dominated by Mozilla's PDF.js since its release in 2011.
+PDF.js parses PDF byte streams, interprets page descriptions, and renders them to HTML5 canvas
+elements. Many readers wrap PDF.js in different frameworks but do not integrate language models.
+
+Recent AI assistants for documents either require uploading files to a server or convert PDFs
+to Markdown before processing. Our approach differs by keeping the rendering pipeline and the
+language model client fully local. This design aligns with the local-first software principles
+described by Kapoor, in which users retain ownership of their data.
+
+\section{Conclusion}
+
+We described a reader architecture that renders PDFs faithfully in the browser while providing
+an AI assistant for navigation and summarization. The system achieves interactive frame rates on
+moderately long documents and keeps user data private by performing text extraction locally.
+Source code and benchmarks are available at \url{https://example.org/cimedaca}.
+
+\begin{thebibliography}{9}
+\bibitem{jones2021}
+B. Jones and L. Smith.
+Adaptive layouts for responsive PDF readers.
+In \emph{Proceedings of the Web Systems Conference}, pages 45--58, 2021.
+
+\bibitem{kapoor2023}
+A. Kapoor.
+Local first software: you own your data.
+\emph{The Local-First Journal}, 2023.
+
+\bibitem{wang2022}
+J. Wang, K. Patel, and M. Chen.
+Evaluating text extraction quality from academic PDFs.
+\emph{Information Retrieval Letters}, 19(3):210--225, 2022.
+\end{thebibliography}
+
+\end{document}
