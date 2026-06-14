@@ -1,0 +1,32 @@
+\documentclass[10pt,twocolumn]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{natbib}
+\usepackage{enumitem}
+\usepackage{xcolor}
+
+\title{Approximate Nearest Neighbor Search in High-Dimensional Spaces using Learned Index Structures}
+\author{
+  Alice Chen\thanks{Department of Computer Science, Stanford University, \texttt{achen@stanford.edu}} \and
+  Bob Martinez\thanks{Google Research, Mountain View, \texttt{bobm@google.com}} \and
+  Carol Nakamura\thanks{MIT CSAIL, Cambridge, \texttt{caroln@mit.edu}}
+}
+\date{June 15, 2024}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Approximate nearest neighbor (ANN) search is a fundamental problem in machine learning, information retrieval, and computer vision. Traditional indexing structures such as KD-trees and ball trees suffer from the \emph{curse of dimensionality}, rendering them ineffective for high-dimensional data. In this paper, we propose \textbf{LearnedANN}, a novel approach that leverages learned index structures to accelerate ANN search. Our method trains a lightweight neural network to predict the probability distribution of candidate points, reducing the search space by up to 94\% compared to brute-force baselines. We evaluate LearnedANN on standard benchmarks (SIFT-1M, GloVe-200, Deep-1B) and show that it achieves \textbf{1.8--3.2x} speedup over HNSW while maintaining recall@10 above 0.95. Our theoretical analysis provides regret bounds for the learned component, and we prove that the expected query time is $O(\log n + d)$ where $d$ is the ambient dimension.
+\end{abstract}
+
+\input{fake_scientific_paper_body.tex}
+
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}
