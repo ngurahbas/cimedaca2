@@ -313,11 +313,20 @@
 
 	.textLayer :global(span[role='img']) {
 		user-select: none;
+		-webkit-user-select: none;
 		cursor: default;
 	}
 
 	.textLayer :global(::selection) {
 		background: color-mix(in srgb, AccentColor, transparent 50%);
 		color: transparent;
+	}
+
+	/* Chromium renders a selection background on <br> elements in the text layer,
+	 causing a stray blue square at the top-left of the page. Keep the <br> in the
+	 selection (so copy/paste line breaks are unaffected) but make its highlight
+	 invisible. Firefox does not paint this background, so it is unaffected. */
+	.textLayer :global(br::selection) {
+		background: transparent;
 	}
 </style>
