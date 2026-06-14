@@ -151,27 +151,15 @@
 									<Combobox.Label class="text-xs font-medium text-surface-950-50"
 										>Model</Combobox.Label
 									>
-									<Combobox.Control class="relative mt-1">
-										<Combobox.Input
-											placeholder="Select a model…"
-											class="w-full rounded-md border border-surface-200-800 bg-surface-50-950 px-3 py-2 pr-10 text-sm text-surface-950-50 placeholder:text-surface-500 focus:border-primary-500 focus:outline-none"
-										/>
-										<Combobox.Trigger
-											class="absolute top-1/2 right-2 -translate-y-1/2 text-surface-500 hover:text-surface-950-50"
-										>
-											<ChevronDown class="h-4 w-4" />
-										</Combobox.Trigger>
+									<Combobox.Control class="mt-1">
+										<Combobox.Input placeholder="Select a model…" />
+										<Combobox.Trigger />
 									</Combobox.Control>
 									<Portal>
 										<Combobox.Positioner>
-											<Combobox.Content
-												class="z-50 max-h-60 w-full overflow-y-auto rounded-md border border-surface-200-800 bg-surface-50-950 p-1 shadow-md"
-											>
+											<Combobox.Content class="z-50 max-h-60 w-full overflow-y-auto">
 												{#each modelItems as item (item.value)}
-													<Combobox.Item
-														{item}
-														class="flex cursor-pointer items-center justify-between rounded-sm px-2 py-1.5 text-sm text-surface-950-50 hover:bg-surface-100-900"
-													>
+													<Combobox.Item {item}>
 														<Combobox.ItemText>{item.label}</Combobox.ItemText>
 														<Combobox.ItemIndicator />
 													</Combobox.Item>
