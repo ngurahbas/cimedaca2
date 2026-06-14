@@ -2,7 +2,7 @@
 	import { Menubar, Switch } from 'bits-ui';
 	import { themeController } from '$lib/stores/theme.svelte';
 	import { readerController } from '$lib/stores/reader.svelte';
-	import ThemeMenuMenu from '../ThemeMenuMenu.svelte';
+	import ThemeSelector from '../ThemeSelector.svelte';
 
 	let fileInput: HTMLInputElement | undefined = $state();
 
@@ -93,7 +93,7 @@
 		</Menubar.Portal>
 	</Menubar.Menu>
 
-	<ThemeMenuMenu />
+	<ThemeSelector />
 
 	<div class="flex items-center gap-2 rounded-sm px-3 py-1.5 hover:bg-surface-100-900">
 		<span class="text-sm font-medium text-surface-950-50 select-none">Dark mode</span>
