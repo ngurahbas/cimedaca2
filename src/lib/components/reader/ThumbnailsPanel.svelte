@@ -2,28 +2,25 @@
 	import { browser } from '$app/environment';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { readerController } from '$lib/stores/reader.svelte';
+	import { loadPdfJs } from '$lib/pdfjs/setup';
 	import type { PDFDocumentProxy } from 'pdfjs-dist';
 
 	type Props = {
 		pdfDoc: PDFDocumentProxy | null;
 		pageCount: number;
-		hasDoc: boolean;
 	};
 
-	let { pdfDoc, pageCount, hasDoc }: Props = $props();
+	let { pdfDoc, pageCount }: Props = $props();
 
 	let thumbContainer: HTMLDivElement | undefined = $state();
-	let workerSet = false;
 
 	const renderedPages = new SvelteSet<number>();
 	let renderQueue: number[] = [];
 	let activeRenders = 0;
 	const MAX_CONCURRENT = 2;
 
-	const renderContents = $derived(readerController.showNav);
-
 	$effect(() => {
-		if (!renderContents || !pdfDoc) return;
+		if (!pdfDoc) return;
 		const root = thumbContainer;
 		if (!root) return;
 		if (readerController.activeTab !== 'thumbs') return;
@@ -79,14 +76,7 @@
 		if (!wrapper || !canvas) return;
 
 		try {
-			const pdfjs = await import('pdfjs-dist');
-			if (!workerSet) {
-				pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-					'pdfjs-dist/build/pdf.worker.min.mjs',
-					import.meta.url
-				).href;
-				workerSet = true;
-			}
+			await loadPdfJs();
 			const page = await doc.getPage(pageNum);
 			const viewport = page.getViewport({ scale: 1 });
 			const targetWidth = 120;
@@ -110,7 +100,7 @@
 	}
 </script>
 
-{#if !hasDoc}
+{#if !pdfDoc}
 	<div class="flex h-full items-center justify-center p-4 text-center text-sm opacity-70">
 		Open a PDF to see thumbnails
 	</div>

@@ -1,26 +1,32 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { browser } from '$app/environment';
 	import { readerController } from '$lib/stores/reader.svelte';
-	import type { PDFDocumentProxy, PDFPageProxy, RenderTask, TextLayer } from 'pdfjs-dist';
+	import { loadPdfJs } from '$lib/pdfjs/setup';
+	import type { PDFPageProxy, RenderTask, TextLayer } from 'pdfjs-dist';
 
-	type Props = {
-		data: ArrayBuffer;
-	};
-	export { scrollToPage, fitToWidth };
-
-	let { data }: Props = $props();
-
-	type Status = 'idle' | 'loading' | 'ready' | 'error';
-	let status = $state<Status>('idle');
-	let errorMessage = $state('');
-	let pdfDocument = $state<PDFDocumentProxy | null>(null);
 	let scrollEl: HTMLDivElement | undefined = $state();
-	let pageCount = $state(0);
 
-	let workerSet = false;
-	let pdfjsModule: typeof import('pdfjs-dist') | null = null;
+	export function scrollToPage(n: number) {
+		if (!scrollEl) return;
+		const target = scrollEl.querySelector<HTMLElement>(`[data-page-number="${n}"]`);
+		target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+	}
+
+	export function fitToWidth() {
+		const doc = readerController.pdfDocument;
+		if (!doc || !scrollEl) return;
+		const computedStyle = window.getComputedStyle(scrollEl);
+		const paddingLeft = parseFloat(computedStyle.paddingLeft);
+		const paddingRight = parseFloat(computedStyle.paddingRight);
+		const availableWidth = scrollEl.clientWidth - paddingLeft - paddingRight;
+
+		void doc.getPage(1).then((page: PDFPageProxy) => {
+			const viewport = page.getViewport({ scale: 1 });
+			const newScale = availableWidth / viewport.width;
+			readerController.setZoom(newScale);
+		});
+	}
 
 	function handleWheel(e: WheelEvent) {
 		if (!e.ctrlKey && !e.metaKey) return;
@@ -31,80 +37,6 @@
 			readerController.zoomOut();
 		}
 	}
-
-	function scrollToPage(n: number) {
-		if (!scrollEl) return;
-		const target = scrollEl.querySelector<HTMLElement>(`[data-page-number="${n}"]`);
-		target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-	}
-
-	function fitToWidth() {
-		if (!pdfDocument || !scrollEl) return;
-		const computedStyle = window.getComputedStyle(scrollEl);
-		const paddingLeft = parseFloat(computedStyle.paddingLeft);
-		const paddingRight = parseFloat(computedStyle.paddingRight);
-		const availableWidth = scrollEl.clientWidth - paddingLeft - paddingRight;
-
-		void pdfDocument.getPage(1).then((page) => {
-			const viewport = page.getViewport({ scale: 1 });
-			const newScale = availableWidth / viewport.width;
-			readerController.setZoom(newScale);
-		});
-	}
-
-	onMount(() => {
-		status = 'loading';
-	});
-
-	$effect(() => {
-		const buffer = data;
-		if (!browser) return;
-
-		let cancelled = false;
-		let prev: PDFDocumentProxy | null = null;
-
-		(async () => {
-			try {
-				const pdfjs = await import('pdfjs-dist');
-				pdfjsModule = pdfjs;
-				if (!workerSet) {
-					pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-						'pdfjs-dist/build/pdf.worker.min.mjs',
-						import.meta.url
-					).href;
-					workerSet = true;
-				}
-
-				const copy = buffer.slice(0);
-				const pdf = await pdfjs.getDocument({ data: copy }).promise;
-				if (cancelled) {
-					await pdf.cleanup();
-					return;
-				}
-
-				prev = pdfDocument;
-				pdfDocument = pdf;
-				pageCount = pdf.numPages;
-				status = 'ready';
-
-				if (prev) {
-					await prev.cleanup();
-				}
-			} catch (err) {
-				if (cancelled) return;
-				console.error('PdfViewer failed to load document:', err);
-				errorMessage = err instanceof Error ? err.message : String(err);
-				status = 'error';
-				if (prev) {
-					await prev.cleanup();
-				}
-			}
-		})();
-
-		return () => {
-			cancelled = true;
-		};
-	});
 
 	function renderPage(
 		page: PDFPageProxy,
@@ -131,65 +63,70 @@
 	}
 
 	$effect(() => {
-		if (status !== 'ready' || !pdfDocument || !pdfjsModule) return;
-		const doc = pdfDocument;
-		const pdfjs = pdfjsModule;
+		const doc = readerController.pdfDocument;
+		const scale = readerController.zoomScale;
+		if (!doc) return;
+
 		const root = scrollEl;
 		if (!root) return;
-
-		const scale = readerController.zoomScale;
 
 		const activeTasks = new SvelteSet<RenderTask>();
 		const activeTextLayers: Array<{ textLayer: TextLayer | null; cancelled: boolean }> = [];
 		let cancelled = false;
 
-		for (let pageNum = 1; pageNum <= pageCount; pageNum++) {
-			const canvas = root.querySelector<HTMLCanvasElement>(`canvas[data-page-canvas="${pageNum}"]`);
-			const textContainer = root.querySelector<HTMLDivElement>(`div[data-page-text="${pageNum}"]`);
-			if (!canvas || !textContainer) continue;
+		void (async () => {
+			const pdfjs = await loadPdfJs();
+			if (cancelled) return;
 
-			void doc.getPage(pageNum).then(async (page) => {
-				if (cancelled) return;
+			for (let pageNum = 1; pageNum <= doc.numPages; pageNum++) {
+				const canvas = root.querySelector<HTMLCanvasElement>(
+					`canvas[data-page-canvas="${pageNum}"]`
+				);
+				const textContainer = root.querySelector<HTMLDivElement>(
+					`div[data-page-text="${pageNum}"]`
+				);
+				if (!canvas || !textContainer) continue;
 
-				const viewport = page.getViewport({ scale });
+				void doc.getPage(pageNum).then(async (page: PDFPageProxy) => {
+					if (cancelled) return;
 
-				// Render canvas
-				const task = renderPage(page, canvas, scale);
-				if (task) {
-					activeTasks.add(task);
-					task.promise.then(() => activeTasks.delete(task)).catch(() => activeTasks.delete(task));
-				}
+					const viewport = page.getViewport({ scale });
 
-				// Render text layer
-				const textLayerEntry = { textLayer: null as TextLayer | null, cancelled: false };
-				activeTextLayers.push(textLayerEntry);
+					const task = renderPage(page, canvas, scale);
+					if (task) {
+						activeTasks.add(task);
+						task.promise.then(() => activeTasks.delete(task)).catch(() => activeTasks.delete(task));
+					}
 
-				try {
-					const textContent = await page.getTextContent();
-					if (cancelled || textLayerEntry.cancelled) return;
+					const textLayerEntry = { textLayer: null as TextLayer | null, cancelled: false };
+					activeTextLayers.push(textLayerEntry);
 
-					// Set CSS scale variables for text layer font sizing
-					textContainer.style.setProperty('--scale-factor', String(viewport.scale));
-					textContainer.style.setProperty('--user-unit', '1');
-					textContainer.style.setProperty(
-						'--total-scale-factor',
-						'calc(var(--scale-factor) * var(--user-unit))'
-					);
+					try {
+						const textContent = await page.getTextContent();
+						if (cancelled || textLayerEntry.cancelled) return;
 
-					const textLayer = new pdfjs.TextLayer({
-						textContentSource: textContent,
-						container: textContainer,
-						viewport
-					});
+						textContainer.style.setProperty('--scale-factor', String(viewport.scale));
+						textContainer.style.setProperty('--user-unit', '1');
+						textContainer.style.setProperty(
+							'--total-scale-factor',
+							'calc(var(--scale-factor) * var(--user-unit))'
+						);
 
-					textLayerEntry.textLayer = textLayer;
-					await textLayer.render();
-				} catch (err) {
-					if (cancelled || textLayerEntry.cancelled) return;
-					console.error(`Text layer render failed for page ${pageNum}:`, err);
-				}
-			});
-		}
+						const textLayer = new pdfjs.TextLayer({
+							textContentSource: textContent,
+							container: textContainer,
+							viewport
+						});
+
+						textLayerEntry.textLayer = textLayer;
+						await textLayer.render();
+					} catch (err) {
+						if (cancelled || textLayerEntry.cancelled) return;
+						console.error(`Text layer render failed for page ${pageNum}:`, err);
+					}
+				});
+			}
+		})();
 
 		return () => {
 			cancelled = true;
@@ -224,26 +161,17 @@
 	});
 </script>
 
-{#if status === 'loading' || status === 'idle'}
-	<div class="flex h-full w-full items-center justify-center">
-		<div class="flex flex-col items-center gap-3 text-surface-950-50">
-			<div
-				class="h-8 w-8 animate-spin rounded-full border-2 border-surface-300-700 border-t-primary-500"
-				aria-hidden="true"
-			></div>
-			<p class="text-sm opacity-70">Loading PDF…</p>
-		</div>
-	</div>
-{:else if status === 'error'}
+{#if readerController.loadError}
 	<div class="flex h-full w-full items-center justify-center p-6">
 		<div
 			class="flex max-w-md flex-col gap-2 card border border-error-500 preset-tonal-surface p-6 text-center"
 		>
 			<h3 class="text-base font-semibold text-error-500">Failed to render PDF</h3>
-			<p class="text-sm opacity-80">{errorMessage}</p>
+			<p class="text-sm opacity-80">{readerController.loadError}</p>
 		</div>
 	</div>
-{:else}
+{:else if readerController.pdfDocument}
+	{@const pageCount = readerController.pdfDocument.numPages}
 	<div
 		bind:this={scrollEl}
 		class="h-full w-full overflow-auto bg-surface-100-900 p-4"
@@ -259,6 +187,16 @@
 					<span class="text-xs opacity-60">Page {pageNum}</span>
 				</div>
 			{/each}
+		</div>
+	</div>
+{:else if readerController.doc}
+	<div class="flex h-full w-full items-center justify-center">
+		<div class="flex flex-col items-center gap-3 text-surface-950-50">
+			<div
+				class="h-8 w-8 animate-spin rounded-full border-2 border-surface-300-700 border-t-primary-500"
+				aria-hidden="true"
+			></div>
+			<p class="text-sm opacity-70">Loading PDF…</p>
 		</div>
 	</div>
 {/if}

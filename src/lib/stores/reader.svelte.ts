@@ -1,4 +1,6 @@
 import { browser } from '$app/environment';
+import type { PDFDocumentProxy } from 'pdfjs-dist';
+import { loadPdfJs } from '$lib/pdfjs/setup';
 
 export type ReaderTab = 'thumbs' | 'outline';
 
@@ -6,6 +8,8 @@ export type ViewerRef = {
 	scrollToPage(n: number): void;
 	fitToWidth(): void;
 };
+
+const PANE_BOUNDS = { min: 240, max: 720 } as const;
 
 class ReaderController {
 	showNav = $state(true);
@@ -15,10 +19,11 @@ class ReaderController {
 	doc = $state.raw<{ name: string; data: ArrayBuffer } | null>(null);
 	viewerRef = $state.raw<ViewerRef | null>(null);
 
+	pdfDocument = $state.raw<PDFDocumentProxy | null>(null);
+	loadError = $state<string | null>(null);
+
 	navPaneWidth = $state(256);
 	aiPaneWidth = $state(320);
-	minPaneWidth = 240;
-	maxPaneWidth = 720;
 
 	zoomScale = $state(1.0);
 	zoomMin = 0.25;
@@ -41,7 +46,7 @@ class ReaderController {
 	}
 
 	clampWidth(w: number) {
-		return Math.max(this.minPaneWidth, Math.min(this.maxPaneWidth, w));
+		return Math.max(PANE_BOUNDS.min, Math.min(PANE_BOUNDS.max, w));
 	}
 
 	setNavPaneWidth(w: number) {
@@ -60,6 +65,10 @@ class ReaderController {
 		this.showAi = !this.showAi;
 	}
 
+	setTab(tab: ReaderTab) {
+		this.activeTab = tab;
+	}
+
 	async openPdfFile(file: File): Promise<void> {
 		try {
 			const data = await file.arrayBuffer();
@@ -70,6 +79,21 @@ class ReaderController {
 	}
 	clearDoc() {
 		this.doc = null;
+	}
+
+	openPdfDialog() {
+		if (!browser) return;
+		const input = document.createElement('input');
+		input.type = 'file';
+		input.accept = 'application/pdf';
+		input.style.display = 'none';
+		input.onchange = async () => {
+			const file = input.files?.[0];
+			input.remove();
+			if (file) await this.openPdfFile(file);
+		};
+		document.body.appendChild(input);
+		input.click();
 	}
 
 	scrollToPage(n: number): void {
@@ -110,5 +134,47 @@ if (browser) {
 			e.preventDefault();
 			readerController.resetZoom();
 		}
+	});
+
+	// Parse the current doc into a shared PDFDocumentProxy. Re-runs whenever `doc`
+	// changes; cleanup happens on swap or when the doc is cleared.
+	$effect.root(() => {
+		$effect(() => {
+			const docState = readerController.doc;
+			if (!docState) {
+				const prev = readerController.pdfDocument;
+				readerController.pdfDocument = null;
+				readerController.loadError = null;
+				void prev?.cleanup();
+				return;
+			}
+
+			let cancelled = false;
+			readerController.loadError = null;
+
+			(async () => {
+				try {
+					const pdfjs = await loadPdfJs();
+					const copy = docState.data.slice(0);
+					const pdf = await pdfjs.getDocument({ data: copy }).promise;
+					if (cancelled) {
+						await pdf.cleanup();
+						return;
+					}
+					const prev = readerController.pdfDocument;
+					readerController.pdfDocument = pdf;
+					if (prev) await prev.cleanup();
+				} catch (err) {
+					if (cancelled) return;
+					console.error('ReaderController: failed to load PDF:', err);
+					readerController.loadError = err instanceof Error ? err.message : String(err);
+					readerController.pdfDocument = null;
+				}
+			})();
+
+			return () => {
+				cancelled = true;
+			};
+		});
 	});
 }

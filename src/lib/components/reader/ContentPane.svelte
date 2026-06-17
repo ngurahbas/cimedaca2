@@ -1,21 +1,13 @@
 <script lang="ts">
-	import { readerController } from '$lib/stores/reader.svelte';
+	import { readerController, type ViewerRef } from '$lib/stores/reader.svelte';
 	import EmptyState from './EmptyState.svelte';
 	import PdfViewer from './PdfViewer.svelte';
 	import ZoomControls from './ZoomControls.svelte';
 
-	let viewer = $state<ReturnType<typeof PdfViewer> | undefined>(undefined);
+	let viewer = $state<PdfViewer | undefined>(undefined);
 
 	$effect(() => {
-		readerController.viewerRef = viewer
-			? {
-					scrollToPage: (n: number) => viewer?.scrollToPage(n),
-					fitToWidth: () => viewer?.fitToWidth()
-				}
-			: null;
-		return () => {
-			readerController.viewerRef = null;
-		};
+		readerController.viewerRef = (viewer as unknown as ViewerRef) ?? null;
 	});
 </script>
 
@@ -25,7 +17,7 @@
 	{#if readerController.doc === null}
 		<EmptyState />
 	{:else}
-		<PdfViewer data={readerController.doc.data} bind:this={viewer} />
+		<PdfViewer bind:this={viewer} />
 		<ZoomControls />
 	{/if}
 </section>
