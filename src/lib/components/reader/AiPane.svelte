@@ -4,7 +4,7 @@
 	import { readerController } from '$lib/stores/reader.svelte';
 	import AiSettings from './AiSettings.svelte';
 
-	const chevronRotation = $derived(readerController.showAi ? 90 : -90);
+	const chevronRotation = $derived(readerController.showAi ? -90 : 90);
 
 	let aiResizing = $state(false);
 

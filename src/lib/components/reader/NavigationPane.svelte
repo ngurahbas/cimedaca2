@@ -180,7 +180,7 @@
 		};
 	});
 
-	const desktopChevronRotation = $derived(readerController.showNav ? -90 : 90);
+	const desktopChevronRotation = $derived(readerController.showNav ? 90 : -90);
 
 	function startNavResize(e: MouseEvent) {
 		e.preventDefault();
