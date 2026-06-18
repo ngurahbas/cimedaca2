@@ -3,7 +3,13 @@
 	import { browser } from '$app/environment';
 	import { readerController } from '$lib/stores/reader.svelte';
 	import { loadPdfJs } from '$lib/pdfjs/setup';
-	import type { PDFPageProxy, RenderTask, TextLayer } from 'pdfjs-dist';
+	import type {
+		AnnotationLayer,
+		PDFDocumentProxy,
+		PDFPageProxy,
+		RenderTask,
+		TextLayer
+	} from 'pdfjs-dist';
 
 	let scrollEl: HTMLDivElement | undefined = $state();
 
@@ -27,6 +33,115 @@
 			readerController.setZoom(newScale);
 		});
 	}
+
+	type LinkService = {
+		setDocument(doc: PDFDocumentProxy | null): void;
+		goToPage(val: number | string): void;
+		goToDestination(dest: string | unknown[] | Promise<unknown[]>): Promise<void>;
+		getDestinationHash(dest: string | unknown[]): string;
+		getAnchorUrl(anchor: string): string;
+		addLinkAttributes(link: HTMLAnchorElement, url: string, newWindow?: boolean): void;
+		executeNamedAction(action: string | { action: string }): void;
+		executeSetOCGState(action: unknown): Promise<void>;
+		isInPresentationMode: boolean;
+		externalLinkEnabled: boolean;
+		externalLinkTarget: number;
+		externalLinkRel: string;
+		baseUrl: string | null;
+		eventBus: { dispatch(name: string, data: unknown): void };
+	};
+
+	const LinkTarget = { NONE: 0, SELF: 1, BLANK: 2, PARENT: 3, TOP: 4 } as const;
+
+	function createLinkService(): LinkService {
+		let doc: PDFDocumentProxy | null = null;
+		const noopEventBus = { dispatch: () => {} };
+		return {
+			setDocument(d) {
+				doc = d;
+			},
+			async goToDestination(dest) {
+				if (!doc) return;
+				let explicit: unknown[] | null = null;
+				if (typeof dest === 'string') {
+					explicit = (await doc.getDestination(dest)) as unknown[] | null;
+				} else if (Array.isArray(dest)) {
+					explicit = dest;
+				} else if (dest && typeof (dest as Promise<unknown[]>).then === 'function') {
+					explicit = (await dest) as unknown[] | null;
+				}
+				if (!Array.isArray(explicit) || explicit.length === 0) return;
+				const ref = explicit[0] as { num: number; gen: number } | number;
+				let pageNumber: number;
+				if (typeof ref === 'number') {
+					pageNumber = ref + 1;
+				} else if (ref && typeof ref === 'object') {
+					const cached = doc.cachedPageNumber(ref);
+					pageNumber = cached ?? (await doc.getPageIndex(ref)) + 1;
+				} else {
+					return;
+				}
+				if (pageNumber < 1 || pageNumber > doc.numPages) return;
+				readerController.scrollToPage(pageNumber);
+			},
+			goToPage(val) {
+				if (!doc) return;
+				const pageNumber = typeof val === 'string' ? parseInt(val, 10) : val;
+				if (!Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > doc.numPages) return;
+				readerController.scrollToPage(pageNumber);
+			},
+			getDestinationHash(dest) {
+				return this.getAnchorUrl(
+					'#' + encodeURIComponent(typeof dest === 'string' ? dest : JSON.stringify(dest))
+				);
+			},
+			getAnchorUrl(anchor) {
+				return this.baseUrl ? this.baseUrl + anchor : anchor;
+			},
+			addLinkAttributes(link, url, newWindow = false) {
+				if (!url || typeof url !== 'string') return;
+				link.href = url;
+				const target = newWindow ? LinkTarget.BLANK : this.externalLinkTarget;
+				link.target =
+					target === LinkTarget.BLANK
+						? '_blank'
+						: target === LinkTarget.SELF
+							? '_self'
+							: target === LinkTarget.PARENT
+								? '_parent'
+								: target === LinkTarget.TOP
+									? '_top'
+									: '';
+				link.rel = this.externalLinkRel;
+			},
+			executeNamedAction(action) {
+				const name = typeof action === 'string' ? action : action?.action;
+				if (name === 'Print') window.print();
+			},
+			async executeSetOCGState() {
+				/* no-op: optional content groups not supported in this viewer */
+			},
+			isInPresentationMode: false,
+			externalLinkEnabled: true,
+			externalLinkTarget: LinkTarget.BLANK,
+			externalLinkRel: 'noopener noreferrer',
+			baseUrl: null,
+			eventBus: noopEventBus
+		};
+	}
+
+	let linkService = $state.raw<LinkService | null>(null);
+
+	$effect(() => {
+		const doc = readerController.pdfDocument;
+		const ls = createLinkService();
+		ls.setDocument(doc);
+		linkService = ls;
+		return () => {
+			ls.setDocument(null);
+			if (linkService === ls) linkService = null;
+		};
+	});
 
 	function handleWheel(e: WheelEvent) {
 		if (!e.ctrlKey && !e.metaKey) return;
@@ -70,8 +185,15 @@
 		const root = scrollEl;
 		if (!root) return;
 
+		const ls = linkService;
+		if (!ls) return;
+
 		const activeTasks = new SvelteSet<RenderTask>();
 		const activeTextLayers: Array<{ textLayer: TextLayer | null; cancelled: boolean }> = [];
+		const activeAnnotationLayers: Array<{
+			annotationLayer: AnnotationLayer | null;
+			cancelled: boolean;
+		}> = [];
 		let cancelled = false;
 
 		void (async () => {
@@ -85,7 +207,10 @@
 				const textContainer = root.querySelector<HTMLDivElement>(
 					`div[data-page-text="${pageNum}"]`
 				);
-				if (!canvas || !textContainer) continue;
+				const annotContainer = root.querySelector<HTMLDivElement>(
+					`div[data-page-annot="${pageNum}"]`
+				);
+				if (!canvas || !textContainer || !annotContainer) continue;
 
 				void doc.getPage(pageNum).then(async (page: PDFPageProxy) => {
 					if (cancelled) return;
@@ -100,6 +225,12 @@
 
 					const textLayerEntry = { textLayer: null as TextLayer | null, cancelled: false };
 					activeTextLayers.push(textLayerEntry);
+
+					const annotationLayerEntry = {
+						annotationLayer: null as AnnotationLayer | null,
+						cancelled: false
+					};
+					activeAnnotationLayers.push(annotationLayerEntry);
 
 					try {
 						const textContent = await page.getTextContent();
@@ -123,6 +254,32 @@
 					} catch (err) {
 						if (cancelled || textLayerEntry.cancelled) return;
 						console.error(`Text layer render failed for page ${pageNum}:`, err);
+					}
+
+					if (cancelled || annotationLayerEntry.cancelled) return;
+
+					try {
+						pdfjs.setLayerDimensions(annotContainer, viewport);
+						const annotationLayer = new pdfjs.AnnotationLayer({
+							div: annotContainer,
+							page,
+							viewport: viewport.clone({ dontFlip: true }),
+							linkService: ls
+						} as ConstructorParameters<typeof pdfjs.AnnotationLayer>[0]);
+						annotationLayerEntry.annotationLayer = annotationLayer;
+						const annotations = await page.getAnnotations({ intent: 'display' });
+						if (cancelled || annotationLayerEntry.cancelled) return;
+						await annotationLayer.render({
+							viewport,
+							annotations,
+							linkService: ls as never,
+							div: annotContainer,
+							page,
+							renderForms: false
+						});
+					} catch (err) {
+						if (cancelled || annotationLayerEntry.cancelled) return;
+						console.error(`Annotation layer render failed for page ${pageNum}:`, err);
 					}
 				});
 			}
@@ -150,11 +307,21 @@
 				}
 			});
 
+			activeAnnotationLayers.forEach((entry) => {
+				entry.cancelled = true;
+			});
+
 			if (root) {
 				const textContainers = root.querySelectorAll<HTMLDivElement>('div[data-page-text]');
 				textContainers.forEach((tc) => {
 					tc.innerHTML = '';
 					tc.style.cssText = '';
+				});
+
+				const annotContainers = root.querySelectorAll<HTMLDivElement>('div[data-page-annot]');
+				annotContainers.forEach((ac) => {
+					ac.innerHTML = '';
+					ac.style.cssText = '';
 				});
 			}
 		};
@@ -183,6 +350,7 @@
 					<div class="relative">
 						<canvas data-page-canvas={pageNum} class="rounded-sm bg-white shadow-sm"></canvas>
 						<div data-page-text={pageNum} class="textLayer absolute inset-0 overflow-clip"></div>
+						<div data-page-annot={pageNum} class="annotationLayer absolute inset-0"></div>
 					</div>
 					<span class="text-xs opacity-60">Page {pageNum}</span>
 				</div>

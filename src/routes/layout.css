@@ -1,6 +1,7 @@
 @import 'tailwindcss';
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
+@import 'pdfjs-dist/web/pdf_viewer.css';
 
 @custom-variant dark (&:where([data-mode="dark"], [data-mode="dark"] *));
 
