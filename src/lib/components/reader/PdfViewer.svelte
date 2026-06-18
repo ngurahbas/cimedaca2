@@ -3,6 +3,7 @@
 	import { browser } from '$app/environment';
 	import { readerController } from '$lib/stores/reader.svelte';
 	import { loadPdfJs } from '$lib/pdfjs/setup';
+	import { injectCitationButtons } from '$lib/pdfjs/citations';
 	import type { PDFPageProxy, RenderTask, TextLayer } from 'pdfjs-dist';
 
 	let scrollEl: HTMLDivElement | undefined = $state();
@@ -120,6 +121,8 @@
 
 						textLayerEntry.textLayer = textLayer;
 						await textLayer.render();
+
+						injectCitationButtons(textContainer, pageNum);
 					} catch (err) {
 						if (cancelled || textLayerEntry.cancelled) return;
 						console.error(`Text layer render failed for page ${pageNum}:`, err);
