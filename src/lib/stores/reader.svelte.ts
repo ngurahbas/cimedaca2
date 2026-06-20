@@ -1,6 +1,8 @@
 import { browser } from '$app/environment';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { loadPdfJs } from '$lib/pdfjs/setup';
+import { extractPdf } from '$lib/llm/extract';
+import type { ExtractedPdf } from '$lib/llm/types';
 
 export type ReaderTab = 'thumbs' | 'outline';
 
@@ -21,6 +23,9 @@ class ReaderController {
 
 	pdfDocument = $state.raw<PDFDocumentProxy | null>(null);
 	loadError = $state<string | null>(null);
+
+	extracted = $state.raw<ExtractedPdf | null>(null);
+	extractionError = $state<string | null>(null);
 
 	navPaneWidth = $state(256);
 	aiPaneWidth = $state(320);
@@ -145,12 +150,16 @@ if (browser) {
 				const prev = readerController.pdfDocument;
 				readerController.pdfDocument = null;
 				readerController.loadError = null;
+				readerController.extracted = null;
+				readerController.extractionError = null;
 				void prev?.cleanup();
 				return;
 			}
 
 			let cancelled = false;
 			readerController.loadError = null;
+			readerController.extracted = null;
+			readerController.extractionError = null;
 
 			(async () => {
 				try {
@@ -164,6 +173,16 @@ if (browser) {
 					const prev = readerController.pdfDocument;
 					readerController.pdfDocument = pdf;
 					if (prev) await prev.cleanup();
+
+					try {
+						const result = await extractPdf(pdf);
+						if (cancelled) return;
+						readerController.extracted = result;
+					} catch (err) {
+						if (cancelled) return;
+						console.error('ReaderController: failed to extract PDF structure:', err);
+						readerController.extractionError = err instanceof Error ? err.message : String(err);
+					}
 				} catch (err) {
 					if (cancelled) return;
 					console.error('ReaderController: failed to load PDF:', err);

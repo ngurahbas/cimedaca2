@@ -27,6 +27,25 @@ export type StreamChatRequest = ChatRequest & {
 	onDelta: (delta: ChatDelta) => void;
 };
 
+export type PdfSectionNode = {
+	title: string;
+	level: number;
+	startPage: number;
+	endPage: number;
+	text: string;
+	children: PdfSectionNode[];
+};
+
+export type PdfPageText = {
+	pageNumber: number;
+	text: string;
+};
+
+export type ExtractedPdf = {
+	tree: PdfSectionNode[];
+	byPage: PdfPageText[];
+};
+
 export class LlmError extends Error {
 	status?: number;
 	code?: string;
