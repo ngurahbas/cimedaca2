@@ -73,8 +73,10 @@ describe('extractPdf', () => {
 		const seenTitles = new Set(titles.map((t) => t.title));
 
 		// Outline from the LaTeX-paper fixture: Introduction, Background, Method,
-		// Experiments, Discussion, Conclusion (and possibly the paper title).
+		// Experiments, Discussion, Conclusion. The source also has an abstract, but
+		// the PDF outline omits it, so extraction synthesizes an Abstract node.
 		const expected = [
+			'Abstract',
 			'Introduction',
 			'Background and Related Work',
 			'Method',
@@ -101,6 +103,22 @@ describe('extractPdf', () => {
 			}
 		}
 		walk(result.tree);
+
+		await doc.cleanup();
+	});
+
+	it('outline path: synthesizes an Abstract section when the PDF outline omits it', async () => {
+		const doc = await loadFixture(FIXTURE_OUTLINE);
+		const result = await extractPdf(doc);
+
+		const abstractNode = result.tree.find((n) => n.title.toLowerCase() === 'abstract');
+		expect(abstractNode).toBeDefined();
+		expect(abstractNode!.startPage).toBe(1);
+		expect(abstractNode!.text).toContain('Approximate nearest neighbor (ANN) search');
+
+		const introNode = result.tree.find((n) => n.title === 'Introduction');
+		expect(introNode).toBeDefined();
+		expect(introNode!.text).not.toContain('Approximate nearest neighbor (ANN) search');
 
 		await doc.cleanup();
 	});

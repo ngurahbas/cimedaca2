@@ -1,7 +1,7 @@
 import { browser } from '$app/environment';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { loadPdfJs } from '$lib/pdfjs/setup';
-import { extractPdf } from '$lib/llm/extract';
+import { extractPdf, toMarkdown } from '$lib/llm/extract';
 import type { ExtractedPdf } from '$lib/llm/types';
 
 export type ReaderTab = 'thumbs' | 'outline';
@@ -178,6 +178,8 @@ if (browser) {
 						const result = await extractPdf(pdf);
 						if (cancelled) return;
 						readerController.extracted = result;
+						console.log('Extracted PDF tree:', result.tree);
+						console.log('Extracted PDF markdown:\n', toMarkdown(result.tree));
 					} catch (err) {
 						if (cancelled) return;
 						console.error('ReaderController: failed to extract PDF structure:', err);

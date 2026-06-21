@@ -76,6 +76,23 @@ function findSplitY(title: string, items: TextContentItem[], destY: number | nul
 	return matches.length > 0 ? itemY(matches[0]) : null;
 }
 
+function findAbstractHeading(pageData: PageItems[]): { page: number; y: number } | null {
+	const firstPage = pageData.find((p) => p.pageNumber === 1);
+	if (!firstPage) return null;
+	const candidates: { y: number; item: TextItemShape }[] = [];
+	for (const item of firstPage.items) {
+		if (!isTextItem(item)) continue;
+		const str = item.str.trim();
+		if (!/^abstract[\s:.]*$/i.test(str)) continue;
+		const y = itemY(item);
+		if (y === null) continue;
+		candidates.push({ y, item });
+	}
+	if (candidates.length === 0) return null;
+	const withEol = candidates.find((c) => c.item.hasEOL);
+	return { page: 1, y: withEol ? withEol.y : candidates[0].y };
+}
+
 function itemsForSection(
 	startPage: number,
 	startY: number | null,
@@ -125,6 +142,84 @@ async function buildByPage(
 		text: joinItems(p.items)
 	}));
 	return { byPage, pageData };
+}
+
+function buildFrontMatterNodes(
+	flat: Array<{
+		node: OutlineNode;
+		depth: number;
+		startPage: number;
+		startY: number | null;
+		endPage: number;
+		endY: number | null;
+	}>,
+	pageData: PageItems[]
+): PdfSectionNode[] {
+	const hasAbstract = flat.some((f) => /abstract/i.test(f.node.title.trim()));
+	if (hasAbstract) return [];
+
+	const first = flat[0];
+	if (!first) return [];
+	// We can only split front matter from the first outline entry when its start
+	// position is known; otherwise we risk duplicating page 1 text.
+	if (first.startPage !== 1 && first.startPage > 1) {
+		// First outline entry is after page 1: everything before it is front matter.
+		const items = itemsForSection(1, null, first.startPage, first.startY, pageData);
+		if (items.length === 0) return [];
+		return [
+			{
+				title: '(front matter)',
+				level: 0,
+				startPage: 1,
+				endPage: first.startPage,
+				text: joinItems(items),
+				children: []
+			}
+		];
+	}
+	if (first.startPage !== 1 || first.startY === null) return [];
+
+	const abstract = findAbstractHeading(pageData);
+	if (!abstract || abstract.y <= first.startY) {
+		// No detectable abstract heading above the first outline entry; still
+		// capture any title/authors text that sits above the first heading.
+		const items = itemsForSection(1, null, 1, first.startY, pageData);
+		if (items.length === 0) return [];
+		return [
+			{
+				title: '(front matter)',
+				level: 0,
+				startPage: 1,
+				endPage: 1,
+				text: joinItems(items),
+				children: []
+			}
+		];
+	}
+
+	const nodes: PdfSectionNode[] = [];
+	const titleItems = itemsForSection(1, null, 1, abstract.y, pageData);
+	if (titleItems.length > 0) {
+		nodes.push({
+			title: '(front matter)',
+			level: 0,
+			startPage: 1,
+			endPage: 1,
+			text: joinItems(titleItems),
+			children: []
+		});
+	}
+
+	const abstractItems = itemsForSection(1, abstract.y, 1, first.startY, pageData);
+	nodes.push({
+		title: 'Abstract',
+		level: 1,
+		startPage: 1,
+		endPage: 1,
+		text: joinItems(abstractItems),
+		children: []
+	});
+	return nodes;
 }
 
 function outlineToTree(
@@ -222,7 +317,9 @@ function outlineToTree(
 		}
 		result.push(built);
 	}
-	return result;
+
+	const frontMatter = buildFrontMatterNodes(flat, pageData);
+	return frontMatter.length > 0 ? [...frontMatter, ...result] : result;
 }
 
 function findOutlineParent(
