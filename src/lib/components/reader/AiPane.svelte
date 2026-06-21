@@ -27,7 +27,7 @@
 	open={readerController.showAi}
 	onOpenChange={(v) => (readerController.showAi = v)}
 	width={readerController.aiPaneWidth}
-	setWidth={readerController.setAiPaneWidth}
+	setWidth={(w) => readerController.setAiPaneWidth(w)}
 	paneTitle="AI"
 	ariaLabel="AI"
 >

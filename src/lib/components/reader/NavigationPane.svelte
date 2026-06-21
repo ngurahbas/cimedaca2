@@ -35,7 +35,7 @@
 	open={readerController.showNav}
 	onOpenChange={(v) => (readerController.showNav = v)}
 	width={readerController.navPaneWidth}
-	setWidth={readerController.setNavPaneWidth}
+	setWidth={(w) => readerController.setNavPaneWidth(w)}
 	paneTitle="Navigation"
 	ariaLabel="Navigation"
 >
