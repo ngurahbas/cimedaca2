@@ -3,6 +3,25 @@
 @plugin '@tailwindcss/typography';
 @import 'pdfjs-dist/web/pdf_viewer.css';
 
+/* pdfjs-dist/web/pdf_viewer.css ends with a :root rule that sets
+   color-scheme: light dark and pins the --lightningcss-* custom
+   properties to the light branch. That rule lands after the
+   data-mode-based :root rules generated from @custom-variant dark
+   below (same specificity, later in cascade), so the light-dark()
+   function (used by Skeleton pair tokens) stops following data-mode
+   and the dark mode switch stops doing anything visible. Re-assert
+   the data-mode-driven values here. */
+:root {
+	color-scheme: light;
+	--lightningcss-light: initial;
+	--lightningcss-dark: ;
+}
+:root:where([data-mode='dark'], [data-mode='dark'] *) {
+	color-scheme: dark;
+	--lightningcss-light: ;
+	--lightningcss-dark: initial;
+}
+
 @custom-variant dark (&:where([data-mode="dark"], [data-mode="dark"] *));
 
 @import '@skeletonlabs/skeleton';
