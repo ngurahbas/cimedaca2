@@ -7,6 +7,8 @@ import { extractPdf, toMarkdown } from '$lib/llm/extract';
 const FIXTURE_DIR = new URL('../../fixtures/pdf/', import.meta.url);
 const FIXTURE_PLAIN = new URL('fake_scientific_paper.pdf', FIXTURE_DIR);
 const FIXTURE_OUTLINE = new URL('fake_scientific_paper_with_outline.pdf', FIXTURE_DIR);
+const FIXTURE_SHARED_OUTLINE = new URL('shared_outline_same_page.pdf', FIXTURE_DIR);
+const FIXTURE_SHARED_STRUCTURE = new URL('shared_structure_same_page.pdf', FIXTURE_DIR);
 
 type GetDocumentParams = Parameters<typeof getDocument>[0];
 
@@ -187,7 +189,7 @@ describe('extractPdf', () => {
 	});
 
 	it('every section has startPage <= endPage and endPage <= numPages', async () => {
-		for (const url of [FIXTURE_PLAIN, FIXTURE_OUTLINE]) {
+		for (const url of [FIXTURE_PLAIN, FIXTURE_OUTLINE, FIXTURE_SHARED_OUTLINE]) {
 			const doc = await loadFixture(url);
 			const result = await extractPdf(doc);
 			function walk(nodes: typeof result.tree): void {
@@ -200,6 +202,56 @@ describe('extractPdf', () => {
 			walk(result.tree);
 			await doc.cleanup();
 		}
+	});
+
+	it('outline path: sections sharing a start page do not duplicate text', async () => {
+		const doc = await loadFixture(FIXTURE_SHARED_OUTLINE);
+		const result = await extractPdf(doc);
+
+		expect(result.tree.length).toBe(3);
+		const [first, second, third] = result.tree;
+		expect(first?.title).toBe('First Section');
+		expect(second?.title).toBe('Second Section');
+		expect(third?.title).toBe('Third Section');
+
+		expect(first?.startPage).toBe(1);
+		expect(first?.endPage).toBe(1);
+		expect(second?.startPage).toBe(1);
+		expect(second?.endPage).toBe(2);
+		expect(third?.startPage).toBe(2);
+		expect(third?.endPage).toBe(2);
+
+		expect(first?.text).toContain('alpha');
+		expect(first?.text).not.toContain('beta');
+
+		expect(second?.text).toContain('beta');
+		expect(second?.text).not.toContain('alpha');
+
+		expect(third?.text).toContain('gamma');
+		expect(third?.text).not.toContain('alpha');
+
+		await doc.cleanup();
+	});
+
+	it('structure-tree path: sections sharing a start page do not duplicate text', async () => {
+		const doc = await loadFixture(FIXTURE_SHARED_STRUCTURE);
+		const result = await extractPdf(doc);
+
+		expect(result.tree.length).toBeGreaterThanOrEqual(2);
+		const titles = result.tree.map((n) => n.title);
+		expect(titles).toContain('First Section');
+		expect(titles).toContain('Second Section');
+
+		const first = result.tree.find((n) => n.title === 'First Section');
+		const second = result.tree.find((n) => n.title === 'Second Section');
+
+		expect(first?.text).toContain('alpha');
+		expect(first?.text).not.toContain('beta');
+
+		expect(second?.text).toContain('beta');
+		expect(second?.text).not.toContain('alpha');
+
+		await doc.cleanup();
 	});
 });
 
