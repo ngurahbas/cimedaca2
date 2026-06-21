@@ -20,10 +20,23 @@
 	const MAX_CONCURRENT = 2;
 
 	$effect(() => {
-		if (!pdfDoc) return;
+		const doc = pdfDoc;
+
+		renderedPages.clear();
+		renderQueue = [];
+		activeRenders = 0;
+
+		if (!doc) return;
 		const root = thumbContainer;
 		if (!root) return;
 		if (readerController.activeTab !== 'thumbs') return;
+
+		for (const canvas of root.querySelectorAll<HTMLCanvasElement>('[data-thumb-item] canvas')) {
+			const ctx = canvas.getContext('2d');
+			if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+			canvas.width = 0;
+			canvas.height = 0;
+		}
 
 		const observer = new IntersectionObserver(
 			(entries) => {
@@ -77,7 +90,9 @@
 
 		try {
 			await loadPdfJs();
+			if (doc !== pdfDoc) return;
 			const page = await doc.getPage(pageNum);
+			if (doc !== pdfDoc) return;
 			const viewport = page.getViewport({ scale: 1 });
 			const targetWidth = 120;
 			const scale = targetWidth / viewport.width;
@@ -93,6 +108,7 @@
 			if (!ctx) return;
 			ctx.scale(dpr, dpr);
 			await page.render({ canvas, canvasContext: ctx, viewport: scaled }).promise;
+			if (doc !== pdfDoc) return;
 			renderedPages.add(pageNum);
 		} catch (err) {
 			console.error(`ThumbnailsPanel: failed to render thumbnail ${pageNum}:`, err);
