@@ -8,7 +8,14 @@ type TextItemShape = Extract<TextContentItem, { str: string }>;
 
 type PageItems = {
 	pageNumber: number;
-	items: PageTextContent['items'];
+	items: TextContentItem[];
+};
+
+type CandidateSection = {
+	title: string;
+	level: number;
+	page: number;
+	y: number | null;
 };
 
 const HEADING_TITLE_MAX_LEN = 120;
@@ -17,7 +24,14 @@ function isTextItem(item: TextContentItem): item is TextItemShape {
 	return 'str' in item;
 }
 
-function joinItems(items: PageTextContent['items']): string {
+function itemY(item: TextItemShape): number | null {
+	if (!Array.isArray(item.transform)) return null;
+	const y = item.transform[5];
+	if (typeof y !== 'number' || Number.isNaN(y)) return null;
+	return y;
+}
+
+function joinItems(items: TextContentItem[]): string {
 	let out = '';
 	for (const item of items) {
 		if (!isTextItem(item)) continue;
@@ -32,65 +46,41 @@ function joinItems(items: PageTextContent['items']): string {
 		.trim();
 }
 
-function itemY(item: TextItemShape): number | null {
-	if (!Array.isArray(item.transform)) return null;
-	const y = item.transform[5];
-	if (typeof y !== 'number' || Number.isNaN(y)) return null;
-	return y;
-}
-
-function findSplitY(title: string, items: TextContentItem[], destY: number | null): number | null {
-	const trimmedTitle = title.trim();
-	if (trimmedTitle.length === 0 && destY === null) return null;
-
+function resolveHeadingY(
+	title: string,
+	items: TextContentItem[],
+	destY: number | null
+): number | null {
 	const textItems = items.filter(isTextItem);
 	if (textItems.length === 0) return null;
 
-	const titleLower = trimmedTitle.toLowerCase();
-	const matches: TextItemShape[] = [];
-	for (const it of textItems) {
-		const str = it.str.trim();
-		if (str.length === 0) continue;
-		const strLower = str.toLowerCase();
-		if (titleLower.length > 0 && (titleLower.includes(strLower) || strLower.includes(titleLower))) {
-			matches.push(it);
-		}
+	const titleLower = title.trim().toLowerCase();
+	const matches = titleLower
+		? textItems.filter((it) => {
+				const s = it.str.trim();
+				if (s.length === 0) return false;
+				const sLower = s.toLowerCase();
+				return sLower.includes(titleLower) || titleLower.includes(sLower);
+			})
+		: [];
+
+	if (destY === null) {
+		return matches.length > 0 ? itemY(matches[0]) : null;
 	}
 
-	if (destY !== null) {
-		const pool = matches.length > 0 ? matches : textItems;
-		let best: TextItemShape | null = null;
-		let bestDist = Infinity;
-		for (const it of pool) {
-			const y = itemY(it);
-			if (y === null) continue;
-			const d = Math.abs(y - destY);
-			if (d < bestDist) {
-				bestDist = d;
-				best = it;
-			}
-		}
-		return best ? itemY(best) : null;
-	}
-
-	return matches.length > 0 ? itemY(matches[0]) : null;
-}
-
-function findAbstractHeading(pageData: PageItems[]): { page: number; y: number } | null {
-	const firstPage = pageData.find((p) => p.pageNumber === 1);
-	if (!firstPage) return null;
-	const candidates: { y: number; item: TextItemShape }[] = [];
-	for (const item of firstPage.items) {
-		if (!isTextItem(item)) continue;
-		const str = item.str.trim();
-		if (!/^abstract[\s:.]*$/i.test(str)) continue;
-		const y = itemY(item);
+	const pool = matches.length > 0 ? matches : textItems;
+	let best: number | null = null;
+	let bestDist = Infinity;
+	for (const it of pool) {
+		const y = itemY(it);
 		if (y === null) continue;
-		candidates.push({ y, item });
+		const d = Math.abs(y - destY);
+		if (d < bestDist) {
+			bestDist = d;
+			best = y;
+		}
 	}
-	if (candidates.length === 0) return null;
-	const withEol = candidates.find((c) => c.item.hasEOL);
-	return { page: 1, y: withEol ? withEol.y : candidates[0].y };
+	return best;
 }
 
 function itemsForSection(
@@ -112,17 +102,9 @@ function itemsForSection(
 				result.push(item);
 				continue;
 			}
-			if (isStart && isEnd) {
-				if ((startY === null || y <= startY) && (endY === null || y > endY)) {
-					result.push(item);
-				}
-			} else if (isStart) {
-				if (startY === null || y <= startY) result.push(item);
-			} else if (isEnd) {
-				if (endY === null || y > endY) result.push(item);
-			} else {
-				result.push(item);
-			}
+			if (isStart && startY !== null && y > startY) continue;
+			if (isEnd && endY !== null && y <= endY) continue;
+			result.push(item);
 		}
 	}
 	return result;
@@ -134,7 +116,7 @@ async function buildByPage(
 	const pageData: PageItems[] = [];
 	for (let i = 1; i <= doc.numPages; i++) {
 		const page = await doc.getPage(i);
-		const tc = await page.getTextContent();
+		const tc = await page.getTextContent({ includeMarkedContent: true });
 		pageData.push({ pageNumber: i, items: tc.items });
 	}
 	const byPage: PdfPageText[] = pageData.map((p) => ({
@@ -144,26 +126,153 @@ async function buildByPage(
 	return { byPage, pageData };
 }
 
-function buildFrontMatterNodes(
-	flat: Array<{
-		node: OutlineNode;
-		depth: number;
-		startPage: number;
-		startY: number | null;
-		endPage: number;
-		endY: number | null;
-	}>,
+function untitledNode(startPage: number, endPage: number, text: string): PdfSectionNode {
+	return {
+		title: '(untitled)',
+		level: 0,
+		startPage,
+		endPage,
+		text,
+		children: []
+	};
+}
+
+function nestFlatByLevel(nodes: PdfSectionNode[]): PdfSectionNode[] {
+	const result: PdfSectionNode[] = [];
+	const stack: PdfSectionNode[] = [];
+	for (const node of nodes) {
+		while (stack.length > 0 && stack[stack.length - 1].level >= node.level) {
+			stack.pop();
+		}
+		if (stack.length === 0) {
+			result.push(node);
+		} else {
+			stack[stack.length - 1].children.push(node);
+		}
+		stack.push(node);
+	}
+	return result;
+}
+
+function buildTree(
+	candidates: CandidateSection[],
+	pageData: PageItems[],
+	numPages: number
+): PdfSectionNode[] {
+	if (candidates.length === 0) {
+		const allText = pageData.map((p) => joinItems(p.items)).join('\n\n');
+		return [untitledNode(1, numPages, allText)];
+	}
+
+	const nodes: PdfSectionNode[] = candidates.map((c, i) => {
+		const next = candidates[i + 1];
+		const endPage = next ? Math.max(c.page, next.page) : numPages;
+		let endY: number | null = null;
+		if (next) {
+			if (next.page === c.page && next.y === null) {
+				endY = Number.POSITIVE_INFINITY;
+			} else {
+				endY = next.y;
+			}
+		}
+		const items = itemsForSection(c.page, c.y, endPage, endY, pageData);
+		return {
+			title: c.title,
+			level: c.level,
+			startPage: c.page,
+			endPage,
+			text: joinItems(items),
+			children: []
+		};
+	});
+
+	return nestFlatByLevel(nodes);
+}
+
+function findAbstractHeading(pageData: PageItems[]): { page: number; y: number } | null {
+	const firstPage = pageData.find((p) => p.pageNumber === 1);
+	if (!firstPage) return null;
+	const candidates: { y: number; item: TextItemShape }[] = [];
+	for (const item of firstPage.items) {
+		if (!isTextItem(item)) continue;
+		const str = item.str.trim();
+		if (!/^abstract[\s:.]*$/i.test(str)) continue;
+		const y = itemY(item);
+		if (y === null) continue;
+		candidates.push({ y, item });
+	}
+	if (candidates.length === 0) return null;
+	const withEol = candidates.find((c) => c.item.hasEOL);
+	return { page: 1, y: withEol ? withEol.y : candidates[0].y };
+}
+
+type OutlineFlat = {
+	node: OutlineNode;
+	depth: number;
+	startPage: number;
+	startY: number | null;
+};
+
+function outlineToTree(
+	outline: OutlineNode[],
+	numPages: number,
 	pageData: PageItems[]
 ): PdfSectionNode[] {
+	const flat: OutlineFlat[] = [];
+
+	function walk(nodes: OutlineNode[], depth: number): void {
+		for (const n of nodes) {
+			flat.push({
+				node: n,
+				depth,
+				startPage: n.pageNumber ?? 0,
+				startY: n.destY
+			});
+			walk(n.items, depth + 1);
+		}
+	}
+	walk(outline, 0);
+
+	if (flat.length === 0) return [];
+
+	for (let i = 0; i < flat.length; i++) {
+		const cur = flat[i];
+		if (cur.startPage > 0) continue;
+		for (let j = i + 1; j < flat.length; j++) {
+			if (flat[j].startPage > 0) {
+				cur.startPage = flat[j].startPage;
+				break;
+			}
+		}
+		if (cur.startPage === 0) cur.startPage = 1;
+		cur.startY = null;
+	}
+
+	for (const f of flat) {
+		const pageItems = pageData.find((p) => p.pageNumber === f.startPage)?.items ?? [];
+		f.startY = resolveHeadingY(f.node.title, pageItems, f.startY);
+	}
+
+	const candidates: CandidateSection[] = flat.map((f) => ({
+		title: f.node.title.trim() || '(untitled)',
+		level: f.depth + 1,
+		page: f.startPage,
+		y: f.startY
+	}));
+
+	const tree = buildTree(candidates, pageData, numPages);
+	const frontMatter = extractFrontMatter(flat, pageData);
+	return frontMatter.length > 0 ? [...frontMatter, ...tree] : tree;
+}
+
+function extractFrontMatter(flat: OutlineFlat[], pageData: PageItems[]): PdfSectionNode[] {
 	const hasAbstract = flat.some((f) => /abstract/i.test(f.node.title.trim()));
 	if (hasAbstract) return [];
 
 	const first = flat[0];
 	if (!first) return [];
-	// We can only split front matter from the first outline entry when its start
-	// position is known; otherwise we risk duplicating page 1 text.
-	if (first.startPage !== 1 && first.startPage > 1) {
-		// First outline entry is after page 1: everything before it is front matter.
+
+	if (first.startPage > 1) {
 		const items = itemsForSection(1, null, first.startPage, first.startY, pageData);
 		if (items.length === 0) return [];
 		return [
@@ -177,12 +286,11 @@ function buildFrontMatterNodes(
 			}
 		];
 	}
+
 	if (first.startPage !== 1 || first.startY === null) return [];
 
 	const abstract = findAbstractHeading(pageData);
 	if (!abstract || abstract.y <= first.startY) {
-		// No detectable abstract heading above the first outline entry; still
-		// capture any title/authors text that sits above the first heading.
 		const items = itemsForSection(1, null, 1, first.startY, pageData);
 		if (items.length === 0) return [];
 		return [
@@ -222,152 +330,22 @@ function buildFrontMatterNodes(
 	return nodes;
 }
 
-function outlineToTree(
-	outline: OutlineNode[],
-	numPages: number,
-	pageData: PageItems[]
-): PdfSectionNode[] {
-	type Flat = {
-		node: OutlineNode;
-		depth: number;
-		startPage: number;
-		startY: number | null;
-		endPage: number;
-		endY: number | null;
-	};
-	const flat: Flat[] = [];
-
-	function walk(nodes: OutlineNode[], depth: number): void {
-		for (const n of nodes) {
-			flat.push({
-				node: n,
-				depth,
-				startPage: n.pageNumber ?? 0,
-				startY: n.destY,
-				endPage: 0,
-				endY: null
-			});
-			walk(n.items, depth + 1);
-		}
-	}
-	walk(outline, 0);
-
-	if (flat.length === 0) return [];
-
-	// Forward-pass: fill startPage for entries that didn't resolve.
-	for (let i = 0; i < flat.length; i++) {
-		const cur = flat[i];
-		if (cur.startPage > 0) continue;
-		for (let j = i + 1; j < flat.length; j++) {
-			if (flat[j].startPage > 0) {
-				cur.startPage = flat[j].startPage;
-				break;
-			}
-		}
-		if (cur.startPage === 0) cur.startPage = 1;
-		cur.startY = null;
-	}
-
-	// Compute endPage/endY and resolve startY using page items + title.
-	for (let i = 0; i < flat.length; i++) {
-		const cur = flat[i];
-		const pageItems = pageData.find((p) => p.pageNumber === cur.startPage)?.items ?? [];
-		cur.startY = findSplitY(cur.node.title, pageItems, cur.startY);
-
-		const next = flat[i + 1];
-		if (next) {
-			cur.endPage = Math.max(cur.startPage, next.startPage);
-			if (next.startPage === cur.startPage && next.startY === null) {
-				// Can't split the shared page: exclude it from this section's text.
-				cur.endY = Number.POSITIVE_INFINITY;
-			} else {
-				cur.endY = next.startY;
-			}
-		} else {
-			cur.endPage = numPages;
-			cur.endY = null;
-		}
-	}
-
-	// Build the section tree, preserving the outline's depth as level (1-based).
-	const nodeMap = new Map<OutlineNode, PdfSectionNode>();
-	for (const f of flat) {
-		const items = itemsForSection(f.startPage, f.startY, f.endPage, f.endY, pageData);
-		nodeMap.set(f.node, {
-			title: f.node.title.trim() || '(untitled)',
-			level: f.depth + 1,
-			startPage: f.startPage,
-			endPage: f.endPage,
-			text: joinItems(items),
-			children: []
-		});
-	}
-
-	const result: PdfSectionNode[] = [];
-	for (const f of flat) {
-		const built = nodeMap.get(f.node);
-		if (!built) continue;
-		const parent = findOutlineParent(outline, f.node, f.depth);
-		if (parent) {
-			const parentBuilt = nodeMap.get(parent);
-			if (parentBuilt) {
-				parentBuilt.children.push(built);
-				continue;
-			}
-		}
-		result.push(built);
-	}
-
-	const frontMatter = buildFrontMatterNodes(flat, pageData);
-	return frontMatter.length > 0 ? [...frontMatter, ...result] : result;
-}
-
-function findOutlineParent(
-	outline: OutlineNode[],
-	target: OutlineNode,
-	targetDepth: number,
-	current: OutlineNode[] = outline,
-	depth: number = 0
-): OutlineNode | null {
-	if (targetDepth === 0) return null;
-	for (const n of current) {
-		if (n === target) return null;
-		if (depth + 1 === targetDepth) {
-			if (n.items.includes(target)) return n;
-			continue;
-		}
-		const found = findOutlineParent(n.items, target, targetDepth, n.items, depth + 1);
-		if (found) return found;
-	}
-	return null;
-}
-
-function isHeadingRole(role: string): boolean {
-	const r = role.toLowerCase();
-	return r === 'h1' || /^h[2-6]$/.test(r) || r === 'heading' || r === 'title';
-}
-
-function headingLevelFromRole(role: string): number | null {
-	if (!isHeadingRole(role)) return null;
-	const r = role.toLowerCase();
-	if (r === 'title' || r === 'heading') return 1;
-	const m = r.match(/^h(\d)$/);
-	if (m) return Number(m[1]);
-	return null;
-}
+// Structure-tree fallback
 
 type StructNode = { role: string; children: unknown[] };
 
-type StructContentRef = { type: 'content'; id: string };
+function isStructContentRef(child: unknown): child is { type: 'content'; id: string } {
+	if (child === null || typeof child !== 'object') return false;
+	const obj = child as Record<string, unknown>;
+	return obj.type === 'content' && typeof obj.id === 'string';
+}
 
-function isStructContentRef(child: unknown): child is StructContentRef {
+function isStructNode(child: unknown): child is StructNode {
 	return (
 		child !== null &&
 		typeof child === 'object' &&
-		'type' in child &&
-		child.type === 'content' &&
-		'id' in child &&
-		typeof (child as { id: unknown }).id === 'string'
+		'role' in (child as object) &&
+		'children' in (child as object)
 	);
 }
 
@@ -401,8 +379,8 @@ function collectStructText(node: StructNode, contentMap: Map<string, TextItemSha
 		if (isStructContentRef(child)) {
 			const items = contentMap.get(child.id) ?? [];
 			for (const item of items) parts.push(item.str);
-		} else if (child && typeof child === 'object' && 'role' in child && 'children' in child) {
-			parts.push(collectStructText(child as StructNode, contentMap));
+		} else if (isStructNode(child)) {
+			parts.push(collectStructText(child, contentMap));
 		}
 	}
 	return parts.join(' ');
@@ -416,125 +394,91 @@ function findHeadingY(node: StructNode, contentMap: Map<string, TextItemShape[]>
 				const y = itemY(item);
 				if (y !== null) return y;
 			}
-		} else if (child && typeof child === 'object' && 'role' in child && 'children' in child) {
-			const y = findHeadingY(child as StructNode, contentMap);
+		} else if (isStructNode(child)) {
+			const y = findHeadingY(child, contentMap);
 			if (y !== null) return y;
 		}
 	}
 	return null;
 }
 
-async function tryStructureTree(
-	doc: PDFDocumentProxy,
-	pageData: PageItems[]
-): Promise<PdfSectionNode[] | null> {
-	type Heading = { level: number; title: string; page: number; y: number | null };
-	const headings: Heading[] = [];
-
-	for (const p of pageData) {
-		const page = await doc.getPage(p.pageNumber);
-		const tree = await page.getStructTree().catch(() => null);
-		if (!tree) continue;
-
-		const tc = await page.getTextContent({ includeMarkedContent: true });
-		const contentMap = buildContentMap(tc.items);
-		collectHeadings(tree as StructNode, headings, p.pageNumber, contentMap);
-	}
-
-	if (headings.length === 0) return null;
-
-	const flat: Array<{
-		title: string;
-		level: number;
-		startPage: number;
-		startY: number | null;
-		endPage: number;
-		endY: number | null;
-		text: string;
-	}> = [];
-	const numPages = doc.numPages;
-	for (let i = 0; i < headings.length; i++) {
-		const h = headings[i];
-		const next = headings[i + 1];
-		const startPage = h.page;
-		const startY = h.y;
-		let endPage: number;
-		let endY: number | null;
-		if (next) {
-			endPage = next.page;
-			if (next.page === startPage && next.y === null) {
-				endY = Number.POSITIVE_INFINITY;
-			} else {
-				endY = next.y;
-			}
-		} else {
-			endPage = numPages;
-			endY = null;
-		}
-		const items = itemsForSection(startPage, startY, endPage, endY, pageData);
-		flat.push({
-			title: h.title,
-			level: h.level,
-			startPage,
-			startY,
-			endPage,
-			endY,
-			text: joinItems(items)
-		});
-	}
-	return nestFlatByLevel(flat, pageData, numPages);
+function headingLevelFromRole(role: string): number | null {
+	const r = role.toLowerCase();
+	if (r === 'title' || r === 'heading') return 1;
+	const m = r.match(/^h(\d)$/);
+	if (m) return Number(m[1]);
+	return null;
 }
 
 function collectHeadings(
 	node: StructNode,
-	out: { level: number; title: string; page: number; y: number | null }[],
 	page: number,
-	contentMap: Map<string, TextItemShape[]>
+	contentMap: Map<string, TextItemShape[]>,
+	out: CandidateSection[]
 ): void {
-	const lvl = headingLevelFromRole(node.role);
-	if (lvl !== null) {
+	const level = headingLevelFromRole(node.role);
+	if (level !== null) {
 		const title =
 			collectStructText(node, contentMap).trim().slice(0, HEADING_TITLE_MAX_LEN) || '(untitled)';
 		const y = findHeadingY(node, contentMap);
-		out.push({ level: lvl, title, page, y });
+		out.push({ title, level, page, y });
 		return;
 	}
 	for (const child of node.children) {
-		if (child && typeof child === 'object' && 'role' in child && 'children' in child) {
-			collectHeadings(child as StructNode, out, page, contentMap);
+		if (isStructNode(child)) {
+			collectHeadings(child, page, contentMap, out);
 		}
 	}
 }
 
-function fontSizeToTree(pageData: PageItems[], numPages: number): PdfSectionNode[] {
-	type Item = { page: number; str: string; hasEOL: boolean; size: number };
-	const items: Item[] = [];
+async function tryStructureTree(
+	doc: PDFDocumentProxy,
+	pageData: PageItems[]
+): Promise<PdfSectionNode[] | null> {
+	const candidates: CandidateSection[] = [];
+	for (const p of pageData) {
+		const page = await doc.getPage(p.pageNumber);
+		const tree = await page.getStructTree().catch(() => null);
+		if (!tree) continue;
+		const contentMap = buildContentMap(p.items);
+		collectHeadings(tree as StructNode, p.pageNumber, contentMap, candidates);
+	}
+	if (candidates.length === 0) return null;
+	return buildTree(candidates, pageData, doc.numPages);
+}
+
+// Font-size heuristic fallback
+
+type FontItem = { page: number; y: number | null; str: string; hasEOL: boolean; size: number };
+
+function computeTitleSize(items: FontItem[], headingSizeSet: Set<number>): number | null {
+	let chosen: number | null = null;
+	for (const it of items) {
+		if (it.page !== 1) break;
+		const bucket = Math.round(it.size * 2) / 2;
+		if (!headingSizeSet.has(bucket)) continue;
+		if (chosen === null || bucket > chosen) chosen = bucket;
+	}
+	return chosen;
+}
+
+function fontSizeCandidates(pageData: PageItems[]): CandidateSection[] {
+	const items: FontItem[] = [];
 	for (const p of pageData) {
 		for (const raw of p.items) {
 			if (!isTextItem(raw)) continue;
-			const ti = raw;
-			if (!Array.isArray(ti.transform) || typeof ti.transform[3] !== 'number') continue;
+			if (!Array.isArray(raw.transform) || typeof raw.transform[3] !== 'number') continue;
 			items.push({
 				page: p.pageNumber,
-				str: ti.str,
-				hasEOL: ti.hasEOL,
-				size: ti.transform[3]
+				y: itemY(raw),
+				str: raw.str,
+				hasEOL: raw.hasEOL,
+				size: raw.transform[3]
 			});
 		}
 	}
 
-	if (items.length === 0) {
-		return [
-			{
-				title: '(untitled)',
-				level: 0,
-				startPage: 1,
-				endPage: numPages,
-				text: '',
-				children: []
-			}
-		];
-	}
+	if (items.length === 0) return [];
 
 	const buckets = new Map<number, number>();
 	for (const it of items) {
@@ -552,165 +496,70 @@ function fontSizeToTree(pageData: PageItems[], numPages: number): PdfSectionNode
 	}
 
 	const headingSizes = [...buckets.entries()]
-		.filter(([size, count]) => size > bodySize + 1 && count >= 1 && count < bodyCount / 2)
+		.filter(([size, count]) => size > bodySize + 1 && count < bodyCount / 2)
 		.sort(([a], [b]) => b - a)
 		.slice(0, 4)
 		.map(([size], idx) => ({ size, level: idx + 1 }));
 
-	if (headingSizes.length === 0) {
-		const allText = pageData.map((p) => joinItems(p.items)).join('\n\n');
-		return [
-			{
-				title: '(untitled)',
-				level: 0,
-				startPage: 1,
-				endPage: numPages,
-				text: allText,
-				children: []
-			}
-		];
-	}
+	if (headingSizes.length === 0) return [];
 
-	// Identify the document title: the largest heading size whose items appear on
-	// page 1. These items are excluded from the section tree.
-	const titleSize = computeTitleSize(items, headingSizes, pageData[0]?.pageNumber ?? 1);
+	const headingSizeSet = new Set(headingSizes.map((h) => h.size));
+	const titleSize = computeTitleSize(items, headingSizeSet);
 
-	// After excluding the title, renumber heading sizes so the largest remaining
-	// size maps to level 1 (H1).
 	const sectionSizes = headingSizes.filter((h) => h.size !== titleSize);
-	const sizeToLevel = new Map(sectionSizes.map((h, idx) => [h.size, idx + 1] as [number, number]));
+	const sizeToLevel = new Map(sectionSizes.map((h, idx) => [h.size, idx + 1]));
 
-	type Event = {
-		kind: 'heading' | 'body';
-		page: number;
-		str: string;
-		level: number;
-		hasEOL: boolean;
-	};
-	const events: Event[] = [];
+	const firstPageNumber = pageData[0]?.pageNumber ?? 1;
+	const candidates: CandidateSection[] = [];
 	for (const it of items) {
 		const bucket = Math.round(it.size * 2) / 2;
-		const isTitleOnFirstPage =
-			titleSize !== null && bucket === titleSize && it.page === (pageData[0]?.pageNumber ?? 1);
-		if (isTitleOnFirstPage) {
-			events.push({ kind: 'body', page: it.page, str: it.str, level: 0, hasEOL: it.hasEOL });
+		if (titleSize !== null && bucket === titleSize && it.page === firstPageNumber) {
 			continue;
 		}
 		const level = sizeToLevel.get(bucket);
 		const trimmed = it.str.trim();
-		const isHeadingCandidate =
-			level !== undefined && trimmed.length > 0 && trimmed.length <= HEADING_TITLE_MAX_LEN;
-		if (isHeadingCandidate) {
-			events.push({ kind: 'heading', page: it.page, str: trimmed, level, hasEOL: it.hasEOL });
-		} else {
-			events.push({ kind: 'body', page: it.page, str: it.str, level: 0, hasEOL: it.hasEOL });
+		if (level !== undefined && trimmed.length > 0 && trimmed.length <= HEADING_TITLE_MAX_LEN) {
+			candidates.push({ title: trimmed, level, page: it.page, y: it.y });
 		}
 	}
-
-	type Flat = { title: string; level: number; startPage: number; endPage: number; text: string };
-	const flat: Flat[] = [];
-	let current: Flat | null = null;
-
-	for (const ev of events) {
-		if (ev.kind === 'heading') {
-			if (current) {
-				flat.push(current);
-			}
-			current = {
-				title: ev.str,
-				level: ev.level,
-				startPage: ev.page,
-				endPage: ev.page,
-				text: ev.str
-			};
-		} else {
-			if (!current) {
-				current = { title: '(untitled)', level: 0, startPage: ev.page, endPage: ev.page, text: '' };
-			}
-			if (current.text.length > 0 && !current.text.endsWith('\n') && ev.str.trim().length > 0) {
-				current.text += ev.hasEOL ? '\n' : ' ';
-			}
-			current.text += ev.str;
-		}
-	}
-	if (current) flat.push(current);
-
-	for (let i = 0; i < flat.length; i++) {
-		const cur = flat[i];
-		const next = flat[i + 1];
-		if (next) {
-			cur.endPage = Math.max(cur.endPage, Math.max(cur.startPage, next.startPage - 1));
-		} else {
-			cur.endPage = Math.max(cur.endPage, numPages);
-		}
-		if (cur.endPage < cur.startPage) cur.endPage = cur.startPage;
-	}
-
-	return nestFlatByLevel(flat, pageData, numPages);
+	return candidates;
 }
 
-function computeTitleSize(
-	items: { page: number; size: number }[],
-	headingSizes: { size: number; level: number }[],
-	firstPageNumber: number
-): number | null {
-	const headingSizeSet = new Set(headingSizes.map((h) => h.size));
-	let chosen: number | null = null;
-	for (const it of items) {
-		if (it.page !== firstPageNumber) break;
-		const bucket = Math.round(it.size * 2) / 2;
-		if (!headingSizeSet.has(bucket)) continue;
-		if (chosen === null || bucket > chosen) chosen = bucket;
-	}
-	return chosen;
-}
-
-function nestFlatByLevel(
-	flat: Array<{ title: string; level: number; startPage: number; endPage: number; text: string }>,
-	pageData: PageItems[],
-	numPages: number
-): PdfSectionNode[] {
-	if (flat.length === 0) {
-		return [
-			{
-				title: '(untitled)',
-				level: 0,
-				startPage: 1,
-				endPage: numPages,
-				text: pageData.map((p) => joinItems(p.items)).join('\n\n'),
-				children: []
-			}
-		];
+function fontSizeToTree(pageData: PageItems[], numPages: number): PdfSectionNode[] {
+	const candidates = fontSizeCandidates(pageData);
+	if (candidates.length === 0) {
+		const allText = pageData.map((p) => joinItems(p.items)).join('\n\n');
+		return [untitledNode(1, numPages, allText)];
 	}
 
-	const result: PdfSectionNode[] = [];
-	const stack: PdfSectionNode[] = [];
-	for (const f of flat) {
-		const node: PdfSectionNode = { ...f, children: [] };
-		while (stack.length > 0 && stack[stack.length - 1].level >= node.level) {
-			stack.pop();
+	const first = candidates[0];
+	let prefix: PdfSectionNode | null = null;
+	if (first.page > 1) {
+		const items = itemsForSection(1, null, first.page - 1, null, pageData);
+		if (items.length > 0) {
+			prefix = untitledNode(1, first.page - 1, joinItems(items));
 		}
-		if (stack.length === 0) {
-			result.push(node);
-		} else {
-			stack[stack.length - 1].children.push(node);
+	} else if (first.y !== null) {
+		const items = itemsForSection(1, null, 1, first.y, pageData);
+		if (items.length > 0) {
+			prefix = untitledNode(1, 1, joinItems(items));
 		}
-		stack.push(node);
 	}
-	return result;
+
+	const tree = buildTree(candidates, pageData, numPages);
+	return prefix ? [prefix, ...tree] : tree;
 }
 
 export async function extractPdf(doc: PDFDocumentProxy): Promise<ExtractedPdf> {
 	const { byPage, pageData } = await buildByPage(doc);
-	const numPages = doc.numPages;
-
 	const outline = await loadOutline(doc);
+
 	let tree: PdfSectionNode[];
 	if (outline.length > 0) {
-		tree = outlineToTree(outline, numPages, pageData);
+		tree = outlineToTree(outline, doc.numPages, pageData);
 	} else {
 		const struct = await tryStructureTree(doc, pageData);
-		tree = struct ?? fontSizeToTree(pageData, numPages);
+		tree = struct ?? fontSizeToTree(pageData, doc.numPages);
 	}
 
 	return { tree, byPage };
@@ -723,15 +572,16 @@ export function toMarkdown(tree: PdfSectionNode[]): string {
 	for (const node of tree) {
 		renderNode(node, lines);
 	}
-	const out = lines.join('\n').replace(/\n{3,}/g, '\n\n');
-	return out.trim();
+	return lines
+		.join('\n')
+		.replace(/\n{3,}/g, '\n\n')
+		.trim();
 }
 
 function renderNode(node: PdfSectionNode, lines: string[]): void {
 	const hashes = '#'.repeat(Math.max(1, node.level));
 	lines.push(`${hashes} ${node.title} (pages ${node.startPage}-${node.endPage})`);
-	const body = node.text.trim().length > 0 ? node.text.trim() : '(no text)';
-	lines.push(body);
+	lines.push(node.text.trim().length > 0 ? node.text.trim() : '(no text)');
 	lines.push('');
 	for (const child of node.children) {
 		renderNode(child, lines);
