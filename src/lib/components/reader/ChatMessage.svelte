@@ -2,6 +2,8 @@
 	import Bot from '@lucide/svelte/icons/bot';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import { Collapsible } from 'bits-ui';
+	import { browser } from '$app/environment';
+	import { renderMarkdown } from '$lib/llm/markdown';
 	import type { UiChatMessage } from '$lib/stores/chat.svelte';
 
 	type Props = {
@@ -10,8 +12,26 @@
 
 	let { message }: Props = $props();
 	let reasoningOpen = $state(false);
+	let renderedContent = $state<string>('');
 
 	let isAssistant = $derived(message.role === 'assistant');
+
+	$effect(() => {
+		if (!isAssistant || !browser) {
+			renderedContent = '';
+			return;
+		}
+		const text = message.content;
+		console.log('[ChatMessage] renderMarkdown called, text length:', text.length);
+		let cancelled = false;
+		renderMarkdown(text).then((html) => {
+			console.log('[ChatMessage] renderMarkdown result length:', html.length);
+			if (!cancelled) renderedContent = html;
+		});
+		return () => {
+			cancelled = true;
+		};
+	});
 </script>
 
 {#if isAssistant}
@@ -45,7 +65,14 @@
 			<div
 				class="min-h-[2.25rem] w-fit max-w-[95%] rounded-2xl rounded-tl-sm border border-surface-200-800 preset-tonal-surface px-3 py-2 text-sm text-surface-950-50"
 			>
-				<span>{message.content}</span>
+				{#if renderedContent}
+					<div class="prose prose-sm max-w-none dark:prose-invert">
+						<!-- eslint-disable-next-line svelte/no-at-html-tags -- sanitized via DOMPurify -->
+						{@html renderedContent}
+					</div>
+				{:else}
+					<span>{message.content}</span>
+				{/if}
 				{#if message.isStreaming}
 					<span
 						class="ml-0.5 inline-block h-2 w-2 animate-pulse rounded-full bg-primary-500 align-middle"

@@ -7,6 +7,7 @@
 	import FileText from '@lucide/svelte/icons/file-text';
 	import AlertCircle from '@lucide/svelte/icons/alert-circle';
 	import { readerController } from '$lib/stores/reader.svelte';
+	import { llmController } from '$lib/stores/llm.svelte';
 	import { chatController } from '$lib/stores/chat.svelte';
 	import SidePane from './SidePane.svelte';
 	import AiSettings from './AiSettings.svelte';
@@ -19,6 +20,9 @@
 
 	const sectionCount = $derived(countSections(extracted?.tree ?? []));
 	const topTitles = $derived((extracted?.tree ?? []).slice(0, 5).map((n) => n.title));
+	const canChat = $derived(
+		llmController.isConfigured && readerController.doc !== null && extracted !== null
+	);
 
 	function countSections(nodes: { children: unknown[] }[]): number {
 		let total = 0;
@@ -111,8 +115,25 @@
 							</p>
 						{/if}
 					</div>
+					{#if !llmController.isConfigured}
+						<div class="flex items-center gap-1.5 text-xs text-warning-500">
+							<AlertCircle class="h-3.5 w-3.5 shrink-0" />
+							<span>Verify provider settings to start chatting.</span>
+						</div>
+					{/if}
+					{#if chatController.error}
+						<div
+							class="flex flex-col gap-1.5 card border border-error-500 preset-tonal-surface p-3"
+						>
+							<div class="flex items-center gap-1.5 text-xs text-error-500">
+								<AlertCircle class="h-3.5 w-3.5 shrink-0" />
+								<span class="font-semibold">Chat error</span>
+							</div>
+							<p class="text-xs opacity-80">{chatController.error}</p>
+						</div>
+					{/if}
 					<ChatMessages />
-					<ChatInput />
+					<ChatInput disabled={!canChat} />
 				</div>
 			{/if}
 		</div>

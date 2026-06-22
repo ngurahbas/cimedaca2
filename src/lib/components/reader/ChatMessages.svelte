@@ -29,7 +29,7 @@
 			<p class="text-xs">Ask anything about the document.</p>
 		</div>
 	{:else}
-		{#each chatController.messages as message (message)}
+		{#each chatController.messages as message, index (index)}
 			<ChatMessage {message} />
 		{/each}
 	{/if}

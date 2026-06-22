@@ -3,6 +3,12 @@
 	import { onMount } from 'svelte';
 	import { Accordion, Combobox, Portal, useListCollection } from '@skeletonlabs/skeleton-svelte';
 	import { llmController } from '$lib/stores/llm.svelte';
+	import {
+		chatController,
+		DEFAULT_CONTEXT_LIMIT,
+		MAX_CONTEXT_LIMIT,
+		MIN_CONTEXT_LIMIT
+	} from '$lib/stores/chat.svelte';
 	import { LlmError } from '$lib/llm/types';
 	import Loader2 from '@lucide/svelte/icons/loader-2';
 	import Eye from '@lucide/svelte/icons/eye';
@@ -17,6 +23,7 @@
 	let isLoading = $state(false);
 	let error = $state<string | null>(null);
 	let abortController = $state<AbortController | null>(null);
+	let contextLimitInput = $state(String(chatController.contextLimit));
 
 	const hasUrl = $derived(urlInput.trim().length > 0);
 	const modelItems = $derived(
@@ -64,6 +71,14 @@
 
 	function toggleShowKey() {
 		showKey = !showKey;
+	}
+
+	function handleContextLimitChange() {
+		const parsed = Number(contextLimitInput.replace(/[^0-9]/g, ''));
+		if (!Number.isNaN(parsed)) {
+			chatController.setContextLimit(parsed);
+		}
+		contextLimitInput = String(chatController.contextLimit);
 	}
 </script>
 
@@ -170,6 +185,40 @@
 								</Combobox>
 							{/if}
 						</div>
+					</div>
+				{/if}
+			{/snippet}
+		</Accordion.ItemContent>
+	</Accordion.Item>
+
+	<Accordion.Item value="chat" class="border-b border-surface-200-800">
+		<Accordion.ItemTrigger
+			class="flex w-full items-center justify-between py-2 text-sm font-semibold text-surface-950-50 outline-none select-none"
+		>
+			<span>Chat Settings</span>
+			<Accordion.ItemIndicator class="group">
+				<ChevronDown class="h-4 w-4 transition group-data-[state=open]:rotate-180" />
+			</Accordion.ItemIndicator>
+		</Accordion.ItemTrigger>
+		<Accordion.ItemContent>
+			{#snippet element(attributes)}
+				{#if !attributes.hidden}
+					<div {...attributes} class="pb-3">
+						<label class="flex flex-col gap-1">
+							<span class="text-xs font-medium text-surface-950-50">Context limit (characters)</span
+							>
+							<input
+								type="text"
+								inputmode="numeric"
+								pattern="[0-9]*"
+								bind:value={contextLimitInput}
+								onblur={handleContextLimitChange}
+								class="w-full rounded-md border border-surface-200-800 bg-surface-50-950 px-3 py-2 text-sm text-surface-950-50 placeholder:text-surface-500 focus:border-primary-500 focus:outline-none"
+							/>
+							<span class="text-xs opacity-60">
+								Default: {DEFAULT_CONTEXT_LIMIT.toLocaleString()} · Range: {MIN_CONTEXT_LIMIT.toLocaleString()}-{MAX_CONTEXT_LIMIT.toLocaleString()}
+							</span>
+						</label>
 					</div>
 				{/if}
 			{/snippet}
