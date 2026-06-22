@@ -1,10 +1,17 @@
+<script module lang="ts">
+	let lastClearedDoc: { name: string; data: ArrayBuffer } | null = null;
+</script>
+
 <script lang="ts">
 	import Bot from '@lucide/svelte/icons/bot';
 	import FileText from '@lucide/svelte/icons/file-text';
 	import AlertCircle from '@lucide/svelte/icons/alert-circle';
 	import { readerController } from '$lib/stores/reader.svelte';
+	import { chatController } from '$lib/stores/chat.svelte';
 	import SidePane from './SidePane.svelte';
 	import AiSettings from './AiSettings.svelte';
+	import ChatMessages from './ChatMessages.svelte';
+	import ChatInput from './ChatInput.svelte';
 
 	const extracted = $derived(readerController.extracted);
 	const extractionError = $derived(readerController.extractionError);
@@ -20,6 +27,15 @@
 		}
 		return total;
 	}
+
+	// Clear the conversation when a new PDF is opened.
+	$effect(() => {
+		const doc = readerController.doc;
+		if (doc && doc !== lastClearedDoc) {
+			chatController.clear();
+			lastClearedDoc = doc;
+		}
+	});
 </script>
 
 <SidePane
@@ -72,7 +88,7 @@
 					</div>
 				</div>
 			{:else}
-				<div class="flex flex-col gap-3">
+				<div class="flex min-h-0 flex-1 flex-col gap-3">
 					<div class="flex items-center gap-2">
 						<Bot class="h-5 w-5 text-primary-500" strokeWidth={1.75} aria-hidden="true" />
 						<h3 class="text-sm font-semibold text-surface-950-50">AI Pane</h3>
@@ -95,10 +111,8 @@
 							</p>
 						{/if}
 					</div>
-					<p class="text-xs opacity-60">
-						Conversation features are coming soon — the extracted structure is ready to feed to an
-						LLM.
-					</p>
+					<ChatMessages />
+					<ChatInput />
 				</div>
 			{/if}
 		</div>
